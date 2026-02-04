@@ -1,7 +1,7 @@
 # Configuration for IP Info Telegram Bot
 # Copy this file to config.py and add your bot token
 
-BOT_TOKEN = ""
+BOT_TOKEN = "YOUR_BOT_TOKEN"
 
 # Optional configurations
 # API_URL = "http://ip-api.com/json/"

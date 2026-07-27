@@ -1,4 +1,3 @@
-
 # 🌍 IP Info Telegram Bot
 
 ![Python Version](https://img.shields.io/badge/python-3.7%2B-blue)
@@ -6,128 +5,195 @@
 ![Telegram](https://img.shields.io/badge/Telegram-Bot-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 
-A Telegram bot that shows your public IP address with detailed location information including country flags, city, ISP, and coordinates.
+A Telegram bot that reports your public IP address with detailed geolocation — country flag, city, ISP, timezone, and coordinates — all behind a few tappable buttons.
+
+---
+
+## 📑 Table of Contents
+
+- [Features](#-features)
+- [Preview](#-preview)
+- [Quick Start](#-quick-start)
+- [Usage](#-usage)
+- [Technical Details](#️-technical-details)
+- [Project Structure](#-project-structure)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Contact](#-contact--links)
+
+---
 
 ## ✨ Features
 
 | Feature | Description |
 |---------|-------------|
-| **📍 IP Address Detection** | Shows your current public IP |
-| **🇺🇸 Country with Flag** | Country name with emoji flag (🇺🇸, 🇷🇺, 🇪🇺, etc.) |
-| **🏙️ Location Details** | City, region, timezone information |
-| **📡 Network Info** | Internet Service Provider (ISP) details |
-| **🗺️ Map Integration** | Show location on OpenStreetMap |
-| **🔄 Real-time Updates** | Refresh information anytime |
-| **🎯 User-friendly** | Simple buttons and intuitive commands |
+| 📍 **IP Detection** | Shows your current public IP |
+| 🇺🇸 **Country + Flag** | Country name with emoji flag |
+| 🏙️ **Location Details** | City, region, and timezone |
+| 📡 **Network Info** | Internet Service Provider (ISP) |
+| 🗺️ **Map Integration** | Open the location on OpenStreetMap / Google Maps |
+| 🔄 **Real-time Refresh** | Re-fetch info anytime |
+| 🎯 **Simple UX** | Inline buttons and plain commands |
 
-## 📸 Screenshots
+---
 
-### Main Interface
+## 📸 Preview
+
+**Main interface**
+
+```
 👋 Hello, User!
 
-Your current IP: 123.45.67.89
-🇺🇸 Country: United States
-🏙️ City: New York
+Your current IP:  123.45.67.89
+🇺🇸 Country:       United States
+🏙️ City:           New York
 
 Select an action:
-[🔄 Refresh Info] [📊 Full Details]
+[🔄 Refresh Info]  [📊 Full Details]
 [📍 Show on Map]
+```
 
-### Full Details
-📍 Your IP Information:
+**Full details**
 
-- 🌐 IP Address: 123.45.67.89
-- 🇺🇸 Country: United States
-- 🏙️ City: New York
-- 🗺️ Region: New York
-- 🕐 Timezone: America/New_York
-- 📡 ISP: Comcast Cable
-- 📍 Coordinates: 40.7128, -74.0060
-- 🌍 Open in Google Maps
+```
+📍 Your IP Information
+
+🌐 IP Address:   123.45.67.89
+🇺🇸 Country:      United States
+🏙️ City:          New York
+🗺️ Region:        New York
+🕐 Timezone:      America/New_York
+📡 ISP:           Comcast Cable
+📍 Coordinates:   40.7128, -74.0060
+🌍 Open in Google Maps
+```
+
+---
 
 ## 🚀 Quick Start
 
 ### 1. Prerequisites
-- Python 3.7 or higher
-- Telegram account
-- Bot token from [@BotFather](https://t.me/botfather)
 
-### 2. Installation
+- Python **3.7+**
+- A Telegram account
+- A bot token from [@BotFather](https://t.me/botfather)
+
+### 2. Install
+
 ```bash
-# Clone the repository
 git clone https://github.com/CraftStick/IPBot-telegram.git
 cd IPBot-telegram
-
-# Install dependencies
 pip install -r requirements.txt
-3. Configuration
-bash
-# Copy example config
+```
+
+### 3. Configure
+
+```bash
 cp config.example.py config.py
+```
 
-# Edit config.py and add your bot token
-# Get your token from @BotFather on Telegram
-4. Run the Bot
-bash
+Open `config.py` and paste the token you got from [@BotFather](https://t.me/botfather):
+
+```python
+BOT_TOKEN = "123456:ABC-DEF..."
+```
+
+### 4. Run
+
+```bash
 python bot.py
-📖 Usage
-Commands
-Command	Description
-/start	Start the bot and show main menu
-/info	Get full IP information
-/help	Show help message
-Buttons
-Button	Action
-- 🔄 Refresh Info	Update IP data
-- 📊 Full Details	Extended information
-- 📍 Show on Map	Open location on map
-- 🛠️ Technical Details
-API Used
-ip-api.com - Free IP geolocation service
+```
 
-Rate limit: 45 requests per minute
+---
 
-No API key required for basic usage
+## 📖 Usage
 
-Dependencies
-pyTelegramBotAPI - Telegram Bot API wrapper
+**Commands**
 
-requests - HTTP library for API calls
+| Command | Description |
+|---------|-------------|
+| `/start` | Start the bot and show the main menu |
+| `/info` | Get full IP information |
+| `/help` | Show the help message |
 
-Installation via pip
-bash
-pip install pyTelegramBotAPI requests
-📁 Project Structure
-text
+**Buttons**
+
+| Button | Action |
+|--------|--------|
+| 🔄 Refresh Info | Re-fetch IP data |
+| 📊 Full Details | Extended information |
+| 📍 Show on Map | Open location on a map |
+
+---
+
+## 🛠️ Technical Details
+
+**API**
+
+Powered by [ip-api.com](https://ip-api.com) — a free IP geolocation service.
+
+- No API key required for basic usage
+- Rate limit: **45 requests/minute** (per source IP)
+
+**Dependencies**
+
+| Package | Purpose |
+|---------|---------|
+| [`pyTelegramBotAPI`](https://pypi.org/project/pyTelegramBotAPI/) | Telegram Bot API wrapper |
+| [`requests`](https://pypi.org/project/requests/) | HTTP client for API calls |
+
+`requirements.txt`:
+
+```
+pyTelegramBotAPI
+requests
+```
+
+---
+
+## 📁 Project Structure
+
+```
 IPBot-telegram/
 ├── bot.py              # Main bot application
 ├── requirements.txt    # Python dependencies
 ├── config.example.py   # Example configuration
-├── README.md          # Documentation
-└── .gitignore         # Git ignore rules
-🤝 Contributing
-Contributions are welcome! Please feel free to submit a Pull Request.
+├── README.md           # Documentation
+└── .gitignore          # Git ignore rules
+```
 
-Fork the repository
+---
 
-Create your feature branch (git checkout -b feature/AmazingFeature)
+## 🐞 Troubleshooting
 
-Commit your changes (git commit -m 'Add some AmazingFeature')
+| Problem | Fix |
+|---------|-----|
+| `Unauthorized` on start | Token in `config.py` is wrong or missing |
+| No response from `/start` | Check the bot is running and the machine has internet access |
+| Geolocation is empty | You may have hit the ip-api rate limit — wait a minute |
 
-Push to the branch (git push origin feature/AmazingFeature)
+---
 
-Open a Pull Request
+## 🤝 Contributing
 
-📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.
+Contributions are welcome!
 
-⭐ Support
-If you find this project useful, please give it a star on GitHub!
+1. Fork the repository
+2. Create a feature branch — `git checkout -b feature/AmazingFeature`
+3. Commit your changes — `git commit -m 'Add AmazingFeature'`
+4. Push the branch — `git push origin feature/AmazingFeature`
+5. Open a Pull Request
 
-📞 Contact & Links
-GitHub: CraftStick
+---
 
-Repository: IPBot-telegram
+## 📄 License
 
-Report Issues: GitHub Issues
+Licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
+---
+
+## 📞 Contact & Links
+
+- **GitHub:** [@CraftStick](https://github.com/CraftStick)
+- **Repository:** [IPBot-telegram](https://github.com/CraftStick/IPBot-telegram)
+- **Report Issues:** [GitHub Issues](https://github.com/CraftStick/IPBot-telegram/issues)

@@ -197,3 +197,14 @@ Licensed under the **MIT License** — see the [LICENSE](LICENSE) file for detai
 - **GitHub:** [@CraftStick](https://github.com/CraftStick)
 - **Repository:** [IPBot-telegram](https://github.com/CraftStick/IPBot-telegram)
 - **Report Issues:** [GitHub Issues](https://github.com/CraftStick/IPBot-telegram/issues)
+
+<div align="center">
+
+---
+
+Если было полезно — поставь ⭐, это очень помогает!
+
+If you found this useful, consider leaving a ⭐ — it helps a lot!
+
+</div>
+

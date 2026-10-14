@@ -1,0 +1,2 @@
+-r ipbot/requirements.txt
+pytest==8.3.3

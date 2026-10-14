@@ -1,265 +1,259 @@
-# 🌍 IP Info Telegram Bot
+<div align="center">
 
-![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Telegram](https://img.shields.io/badge/Telegram-Bot-blue)
-![Status](https://img.shields.io/badge/status-active-success)
+# 🌍 IP Info Bot
 
-A Telegram bot that looks up any IP address or domain and shows its geolocation — country flag, city, ISP, AS, timezone, coordinates, and proxy/hosting flags — with one-tap map links.
+**A Telegram bot that tells you everything about an IP address or domain**
 
-> ℹ️ Telegram does not share users' IP addresses with bots, so the bot looks up the address you send it. To check your own IP, open [ifconfig.me](https://ifconfig.me) and send the result to the bot.
+Location on an interactive map · provider & AS · WHOIS · inline mode · 🇬🇧 English / 🇷🇺 Russian
 
----
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Telegram](https://img.shields.io/badge/Telegram-Bot_API-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://core.telegram.org/bots/api)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](#-docker)
+[![License: MIT](https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge)](LICENSE)
 
-## 📑 Table of Contents
+[Features](#-features) •
+[Quick start](#-quick-start) •
+[Docker](#-docker) •
+[Usage](#-usage) •
+[How it works](#%EF%B8%8F-how-it-works) •
+[FAQ](#-faq)
 
-- [Features](#-features)
-- [Preview](#-preview)
-- [Quick Start](#-quick-start)
-- [Docker](#-docker)
-- [Usage](#-usage)
-- [Tests](#-tests)
-- [Technical Details](#️-technical-details)
-- [Project Structure](#-project-structure)
-- [Contributing](#-contributing)
-- [License](#-license)
-- [Contact](#-contact--links)
+<br>
 
----
+<img src="docs/preview.svg" alt="Bot reply: a map pin and a card with location, network and WHOIS info" width="420">
+
+</div>
+
+<br>
 
 ## ✨ Features
 
-| Feature | Description |
-|---------|-------------|
-| 🔎 **Any IP or domain** | IPv4, IPv6, domains (incl. IDN like `пример.рф`), URLs and `host:port` |
-| 🇺🇸 **Country + Flag** | Country name with emoji flag |
-| 🏙️ **Location Details** | City, region, ZIP code, continent, timezone with local time |
-| 📡 **Network Info** | ISP, organization, AS and hostname (PTR) |
-| 🌐 **WHOIS** | Registrar, registration and expiry dates of a domain (warns when it expires soon) |
-| 🛡️ **Address Type** | Mobile network, proxy / VPN / Tor, hosting / data center flags |
-| 🗺️ **Map** | An interactive Telegram map pin comes right above every card, plus OpenStreetMap / Google Maps / WHOIS links |
-| 💬 **Inline Mode** | Type `@your_bot 8.8.8.8` in any chat and send the result card |
-| 🇷🇺 **Two Languages** | English and Russian, picked from the user's Telegram language |
-| ⚡ **Caching** | Repeated lookups are cached for 5 minutes to respect API limits |
+<table>
+<tr>
+<td width="50%" valign="top">
 
----
+### 🔎 Any input
+IPv4, IPv6, domains (even `пример.рф`), links like `https://site.com/page` and `host:port` — just paste it.
 
-## 📸 Preview
+</td>
+<td width="50%" valign="top">
 
-```
-You: yandex.ru
+### 🗺️ Interactive map
+A Telegram map pin you can pinch and drag comes with every answer, plus OpenStreetMap and Google Maps buttons.
 
-[🗺️ Telegram map pin: Moscow, Russia · 77.88.55.88 · Yandex LLC]
+</td>
+</tr>
+<tr>
+<td valign="top">
 
-🇷🇺 yandex.ru
-77.88.55.88 · IPv4
+### 📍 Location
+Country with flag, region, city, ZIP code, continent, timezone with the current local time and coordinates.
 
-📍 Location
-┃ Moscow, Russia
-┃ Continent: Europe
-┃ ZIP code: 119021
-┃ Timezone: Europe/Moscow (UTC+3), now 12:05
-┃ Coordinates: 55.7558, 37.6173
+</td>
+<td valign="top">
 
-📡 Network
-┃ ISP: Yandex LLC
-┃ AS: AS13238 (YANDEX)
-┃ Hostname: yandex.ru
+### 📡 Network
+Internet provider, organization, autonomous system (AS) and hostname (PTR), with a WHOIS / BGP link for the IP.
 
-🌐 WHOIS
-┃ Registrar: RU-CENTER-RU
-┃ Registered: 1997-09-23 (29 years ago)
-┃ Expires: 2027-10-01 (in 11 months)
+</td>
+</tr>
+<tr>
+<td valign="top">
 
-┃ 🖥️ Hosting / data center
+### 🌐 WHOIS for domains
+Registrar, registration and expiry dates — with a ⚠️ warning when the domain expires within 30 days.
 
-[🗺️ OpenStreetMap]  [🌍 Google Maps]
-[🔎 WHOIS / BGP]
-```
+</td>
+<td valign="top">
 
----
+### 🛡️ Address type
+Flags mobile networks, proxies / VPN / Tor and hosting / data center addresses.
 
-## 🚀 Quick Start
+</td>
+</tr>
+<tr>
+<td valign="top">
 
-### 1. Prerequisites
+### 💬 Inline mode
+Type `@your_bot 8.8.8.8` in any chat and send the card right there — no need to open the bot.
 
-- Python **3.9+**
-- A Telegram account
-- A bot token from [@BotFather](https://t.me/botfather)
+</td>
+<td valign="top">
 
-### 2. Install
+### 🇷🇺 Two languages
+English and Russian, picked automatically from the user's Telegram language — country and city names too.
+
+</td>
+</tr>
+</table>
+
+## 🚀 Quick start
+
+> **You need:** Python 3.10+ and a bot token from [@BotFather](https://t.me/botfather).
+
+**1. Install**
 
 ```bash
 git clone https://github.com/CraftStick/IPBot-telegram.git
-cd IPBot-telegram/ipbot
-pip install -r requirements.txt
+cd IPBot-telegram
+pip install -r ipbot/requirements.txt
 ```
 
-### 3. Configure
-
-Either set an environment variable (recommended):
+**2. Add your token** — either as an environment variable:
 
 ```bash
 export BOT_TOKEN="123456:ABC-DEF..."
 ```
 
-or create a config file:
+or in a config file (it's git-ignored, so the token never ends up in the repo):
 
 ```bash
-cp config.example.py config.py
+cp ipbot/config.example.py ipbot/config.py   # then paste the token into config.py
 ```
 
-and paste the token you got from [@BotFather](https://t.me/botfather) into `config.py`. The `BOT_TOKEN` environment variable takes priority; `config.py` is git-ignored.
-
-### 4. Run
+**3. Run**
 
 ```bash
-python bot.py
+python ipbot/bot.py
 ```
 
-### 5. Enable inline mode (optional)
-
-In [@BotFather](https://t.me/botfather) send `/setinline`, choose your bot and enter a placeholder such as `IP address or domain`. After that `@your_bot 8.8.8.8` works in any chat.
-
----
+> [!TIP]
+> To make `@your_bot 8.8.8.8` work in any chat, send `/setinline` to [@BotFather](https://t.me/botfather), pick your bot and enter a placeholder like `IP address or domain`.
 
 ## 🐳 Docker
 
 ```bash
-cp .env.example .env   # put your token into .env
+cp .env.example .env          # put your token into .env
 docker compose up -d --build
 ```
 
-The image contains only the bot code; the token is passed through `.env` and the container restarts automatically.
-
----
+The image contains only the bot code, runs as a non-root user and restarts automatically.
 
 ## 📖 Usage
 
-Just send the bot an IP address, domain, or link — or use a command:
+Send the bot an IP address, a domain or a link — or use a command:
 
-| Command | Description |
-|---------|-------------|
+| Command | What it does |
+|:--|:--|
 | `/ip <address>` | Look up an IP address or domain |
 | `/info <address>` | Same as `/ip` |
+| `/help` | How to use the bot |
 | `/start` | Welcome message |
-| `/help` | Show the help message |
 
-Examples: `8.8.8.8`, `2606:4700::1111`, `google.com`, `https://github.com/CraftStick`
+**Try:** `8.8.8.8` · `2606:4700::1111` · `google.com` · `пример.рф` · `https://github.com/CraftStick`
 
-**Inline mode** — in any chat type `@your_bot google.com` and pick the result: a card with the IP info or a map pin.
+In groups the bot answers only to commands, so it doesn't react to every message.
 
-The interface language (English / Russian) follows the user's Telegram language; country and city names are localized too.
+## ⚙️ How it works
 
-For domains the card also shows **WHOIS** data: registrar, registration and expiry dates. It comes from [RDAP](https://about.rdap.org/) when the domain zone supports it, otherwise from classic WHOIS servers (port 43); for `.ru` / `.рф` / `.su` `whois.nic.ru` is used as a backup when the registry server is unreachable. Some zones (e.g. `.de`) don't publish these dates — then the section is skipped.
+| Data | Source | Notes |
+|:--|:--|:--|
+| Geolocation, ISP, AS, PTR, flags | [ip-api.com](https://ip-api.com) | Free, no key; 45 requests/min per bot — answers are cached for 5 min |
+| Domain registration | [RDAP](https://about.rdap.org/) → classic WHOIS | RDAP where the zone supports it, otherwise port-43 WHOIS; `whois.nic.ru` as a backup for `.ru` / `.рф` / `.su` |
+| Local time | [`tzdata`](https://pypi.org/project/tzdata/) | Works the same on Linux, macOS, Windows and in Docker |
+| Telegram | [`pyTelegramBotAPI`](https://pypi.org/project/pyTelegramBotAPI/) | Long polling, no webhook or public server needed |
 
-Private and reserved addresses (`192.168.x.x`, `10.x.x.x`, `127.0.0.1`, …) have no public location and are rejected.
+WHOIS is requested in parallel with the geolocation, so domains don't wait twice. Private and reserved addresses (`192.168.x.x`, `10.x.x.x`, `127.0.0.1`…) are rejected right away — they have no public location.
 
----
+<details>
+<summary><b>📁 Project structure</b></summary>
 
-## 🛠️ Technical Details
-
-**API**
-
-Powered by [ip-api.com](https://ip-api.com) — a free IP geolocation service.
-
-- No API key required for basic usage
-- Rate limit: **45 requests/minute** (per source IP)
-
-**Dependencies**
-
-| Package | Purpose |
-|---------|---------|
-| [`pyTelegramBotAPI`](https://pypi.org/project/pyTelegramBotAPI/) | Telegram Bot API wrapper |
-| [`requests`](https://pypi.org/project/requests/) | HTTP client for API calls |
-| [`tzdata`](https://pypi.org/project/tzdata/) | Timezone database for local time |
-
-`requirements.txt`:
+<br>
 
 ```
-pyTelegramBotAPI==4.19.1
-requests==2.32.3
-tzdata==2024.2
+IPBot-telegram/
+├── ipbot/
+│   ├── bot.py              # Bot: handlers, card formatting, inline mode
+│   ├── texts.py            # English and Russian texts
+│   ├── domaininfo.py       # WHOIS / RDAP lookups
+│   ├── config.example.py   # Config template (copy to config.py)
+│   └── requirements.txt
+├── tests/                  # pytest tests
+├── docs/preview.svg        # Picture for this README
+├── Dockerfile
+├── docker-compose.yml
+├── .env.example            # Token template for Docker
+└── requirements-dev.txt    # Bot + pytest
 ```
 
----
+</details>
 
-## 🧪 Tests
+<details>
+<summary><b>🧪 Tests</b></summary>
+
+<br>
 
 ```bash
 pip install -r requirements-dev.txt
 pytest
 ```
 
-Tests don't need a bot token or network access: Telegram and ip-api are mocked.
+Tests need neither a bot token nor internet access: Telegram, ip-api and WHOIS servers are mocked.
 
----
+</details>
 
-## 📁 Project Structure
+## ❓ FAQ
 
-```
-IPBot-telegram/
-├── ipbot/
-│   ├── bot.py              # Main bot application
-│   ├── texts.py            # English and Russian texts
-│   ├── domaininfo.py       # WHOIS / RDAP lookups
-│   ├── config.example.py   # Example configuration
-│   └── requirements.txt    # Python dependencies
-├── tests/                  # pytest tests
-├── Dockerfile
-├── docker-compose.yml
-├── .env.example            # Example environment file for Docker
-├── requirements-dev.txt    # Dependencies for running tests
-├── README.md               # Documentation
-├── LICENSE                 # MIT License
-└── .gitignore              # Git ignore rules
-```
+<details>
+<summary><b>Can the bot show my own IP?</b></summary>
 
----
+<br>
 
-## 🐞 Troubleshooting
+No — Telegram never shares users' IP addresses with bots. Open [ifconfig.me](https://ifconfig.me) and send the address you see there to the bot.
+
+</details>
+
+<details>
+<summary><b>How precise is the location?</b></summary>
+
+<br>
+
+City level at best. IP geolocation shows where the provider's network is registered, not where a person is — that's why the map shows an approximate point.
+
+</details>
+
+<details>
+<summary><b>Why is there no WHOIS section for some domains?</b></summary>
+
+<br>
+
+Some zones (e.g. `.de`) don't publish registration dates at all. For `.ru` / `.рф` / `.su`, if the registry server is unreachable from your network, the backup `whois.nic.ru` only knows domains registered through RU-CENTER.
+
+</details>
+
+<details>
+<summary><b>Something doesn't work</b></summary>
+
+<br>
 
 | Problem | Fix |
-|---------|-----|
-| `Bot token is not set` | Set `BOT_TOKEN` or create `config.py` from `config.example.py` |
+|:--|:--|
+| `Bot token is not set` | Set `BOT_TOKEN` or create `ipbot/config.py` from `config.example.py` |
 | `Unauthorized` on start | The token is wrong — get a new one from @BotFather |
-| No response from `/start` | Check the bot is running and the machine has internet access |
+| No answer to `/start` | Make sure the bot is running and the machine has internet access |
 | `@your_bot` shows nothing in chats | Inline mode is off — enable it with `/setinline` in @BotFather |
-| "Too many requests" | The ip-api limit (45 requests/minute for the whole bot) was hit — wait a minute |
+| "Too many requests" | The ip-api limit (45 requests/min for the whole bot) was hit — wait a minute |
 
----
+</details>
 
 ## 🤝 Contributing
 
-Contributions are welcome!
+Ideas and pull requests are welcome! Found a bug? [Open an issue](https://github.com/CraftStick/IPBot-telegram/issues).
 
-1. Fork the repository
-2. Create a feature branch — `git checkout -b feature/AmazingFeature`
-3. Commit your changes — `git commit -m 'Add AmazingFeature'`
-4. Push the branch — `git push origin feature/AmazingFeature`
-5. Open a Pull Request
-
----
+1. Fork the repo and create a branch: `git checkout -b feature/my-idea`
+2. Make sure `pytest` passes
+3. Open a pull request
 
 ## 📄 License
 
-Licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
-
----
-
-## 📞 Contact & Links
-
-- **GitHub:** [@CraftStick](https://github.com/CraftStick)
-- **Repository:** [IPBot-telegram](https://github.com/CraftStick/IPBot-telegram)
-- **Report Issues:** [GitHub Issues](https://github.com/CraftStick/IPBot-telegram/issues)
+[MIT](LICENSE) © [CraftStick](https://github.com/CraftStick)
 
 <div align="center">
 
----
+<br>
+
+**If the bot was useful — give it a ⭐, it really helps!**
 
 Если было полезно — поставь ⭐, это очень помогает!
 
-If you found this useful, consider leaving a ⭐ — it helps a lot!
-
 </div>
-

@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="864" viewBox="0 0 520 864" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#cfe3a8"/>
+      <stop offset="0.55" stop-color="#a9cf8f"/>
+      <stop offset="1" stop-color="#8dbf86"/>
+    </linearGradient>
+    <linearGradient id="land" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eef0e4"/>
+      <stop offset="1" stop-color="#e3e8d6"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="1" stdDeviation="0.8" flood-color="#2f4a1f" flood-opacity="0.18"/>
+    </filter>
+    <clipPath id="thumb"><rect x="30" y="98" width="80" height="80" rx="10"/></clipPath>
+    <style>
+      .t { font-size: 15px; fill: #111; }
+      .b { font-weight: 600; }
+      .m { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; }
+      .muted { fill: #8a8f94; }
+      .time { font-size: 11px; fill: #8a8f94; }
+      .h { font-size: 15px; font-weight: 600; fill: #111; }
+      .btn { font-size: 14px; font-weight: 600; fill: #fff; }
+      .q { fill: #e7f4df; }
+      .bar { fill: #5aae4e; }
+      .qm { font-size: 22px; font-weight: 700; fill: #5aae4e; }
+    </style>
+  </defs>
+
+  <rect width="520" height="864" rx="18" fill="url(#bg)"/>
+
+  <!-- user message -->
+  <g filter="url(#shadow)">
+    <rect x="376" y="20" width="124" height="46" rx="16" fill="#effdde"/>
+  </g>
+  <text x="392" y="48" class="t">yandex.ru</text>
+  <text x="463" y="58" class="time" fill="#5fae55" style="fill:#5fae55">12:05</text>
+
+  <!-- map pin message -->
+  <g filter="url(#shadow)">
+    <rect x="20" y="86" width="330" height="104" rx="16" fill="#fff"/>
+  </g>
+  <g clip-path="url(#thumb)">
+    <rect x="30" y="98" width="80" height="80" fill="url(#land)"/>
+    <path d="M30 150 C55 140 70 160 110 146" stroke="#a9d1f0" stroke-width="7" fill="none"/>
+    <path d="M30 118 L110 132" stroke="#ffffff" stroke-width="4"/>
+    <path d="M62 98 L74 178" stroke="#ffffff" stroke-width="4"/>
+    <path d="M30 170 L95 98" stroke="#f6d78b" stroke-width="3"/>
+    <rect x="84" y="104" width="18" height="12" fill="#cfe6bf"/>
+    <rect x="36" y="124" width="14" height="14" fill="#cfe6bf"/>
+    <circle cx="70" cy="138" r="11" fill="#fff"/>
+    <circle cx="70" cy="138" r="7.5" fill="#3d9be9"/>
+  </g>
+  <text x="124" y="132" class="t" style="font-size:16px">Moscow, Russia</text>
+  <text x="124" y="156" class="t muted">77.88.55.88 · Yandex LLC</text>
+  <text x="310" y="180" class="time">12:05</text>
+
+  <!-- info card -->
+  <g filter="url(#shadow)">
+    <rect x="20" y="202" width="480" height="546" rx="16" fill="#fff"/>
+  </g>
+
+  <text x="36" y="232" class="t b">🇷🇺 <tspan fill="#2481cc">yandex.ru</tspan></text>
+  <text x="36" y="256" class="t"><tspan class="m">77.88.55.88</tspan> · IPv4</text>
+
+  <text x="36" y="292" class="h">📍 Location</text>
+  <rect x="34" y="302" width="452" height="122" rx="6" class="q"/>
+  <rect x="34" y="302" width="3" height="122" rx="1.5" class="bar"/>
+  <text x="472" y="322" class="qm">”</text>
+  <text x="48" y="324" class="t">Moscow, Russia</text>
+  <text x="48" y="346" class="t"><tspan class="b">Continent:</tspan> Europe</text>
+  <text x="48" y="368" class="t"><tspan class="b">ZIP code:</tspan> <tspan class="m">119021</tspan></text>
+  <text x="48" y="390" class="t"><tspan class="b">Timezone:</tspan> Europe/Moscow (UTC+3), now 12:05</text>
+  <text x="48" y="412" class="t"><tspan class="b">Coordinates:</tspan> <tspan class="m">55.7558, 37.6173</tspan></text>
+
+  <text x="36" y="456" class="h">📡 Network</text>
+  <rect x="34" y="466" width="452" height="78" rx="6" class="q"/>
+  <rect x="34" y="466" width="3" height="78" rx="1.5" class="bar"/>
+  <text x="472" y="486" class="qm">”</text>
+  <text x="48" y="488" class="t"><tspan class="b">ISP:</tspan> Yandex LLC</text>
+  <text x="48" y="510" class="t"><tspan class="b">AS:</tspan> AS13238 (YANDEX)</text>
+  <text x="48" y="532" class="t"><tspan class="b">Hostname:</tspan> <tspan class="m">yandex.ru</tspan></text>
+
+  <text x="36" y="576" class="h">🌐 WHOIS</text>
+  <rect x="34" y="586" width="452" height="78" rx="6" class="q"/>
+  <rect x="34" y="586" width="3" height="78" rx="1.5" class="bar"/>
+  <text x="472" y="606" class="qm">”</text>
+  <text x="48" y="608" class="t"><tspan class="b">Registrar:</tspan> RU-CENTER-RU</text>
+  <text x="48" y="630" class="t"><tspan class="b">Registered:</tspan> 1997-09-23 (29 years ago)</text>
+  <text x="48" y="652" class="t"><tspan class="b">Expires:</tspan> 2027-10-01 (in 11 months)</text>
+
+  <rect x="34" y="680" width="236" height="36" rx="6" class="q"/>
+  <rect x="34" y="680" width="3" height="36" rx="1.5" class="bar"/>
+  <text x="48" y="704" class="t">🖥️ Hosting / data center</text>
+
+  <text x="460" y="738" class="time">12:05</text>
+
+  <!-- inline buttons -->
+  <rect x="20" y="756" width="237" height="42" rx="12" fill="#3f6d34" fill-opacity="0.42"/>
+  <rect x="263" y="756" width="237" height="42" rx="12" fill="#3f6d34" fill-opacity="0.42"/>
+  <rect x="20" y="804" width="480" height="42" rx="12" fill="#3f6d34" fill-opacity="0.42"/>
+  <text x="138.5" y="782" class="btn" text-anchor="middle">🗺️ OpenStreetMap</text>
+  <text x="381.5" y="782" class="btn" text-anchor="middle">🌍 Google Maps</text>
+  <text x="260" y="830" class="btn" text-anchor="middle">🔎 WHOIS / BGP</text>
+</svg>

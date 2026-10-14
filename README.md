@@ -6,11 +6,6 @@
 
 Location on an interactive map · provider & AS · WHOIS · inline mode · 🇬🇧 English / 🇷🇺 Russian
 
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Telegram](https://img.shields.io/badge/Telegram-Bot_API-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://core.telegram.org/bots/api)
-[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](#-docker)
-[![License: MIT](https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge)](LICENSE)
-
 [Features](#-features) •
 [Quick start](#-quick-start) •
 [Docker](#-docker) •

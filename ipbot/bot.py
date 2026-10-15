@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -18,7 +19,7 @@ import telebot
 from telebot import types
 
 import domaininfo
-from texts import DEFAULT_LANG, LANGUAGES, format_duration, get_lang, t
+from texts import DEFAULT_LANG, LANGUAGES, NETWORK_EMOJI, PIN_EMOJI, format_duration, get_lang, t
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,12 +31,15 @@ log = logging.getLogger("ipbot")
 API_URL = "http://ip-api.com/json/{}"
 API_FIELDS = (
     "status,message,query,continent,country,countryCode,regionName,city,district,zip,"
-    "timezone,isp,org,as,asname,reverse,lat,lon,mobile,proxy,hosting"
+    "timezone,isp,org,as,asname,reverse,lat,lon,mobile"
 )
 API_TIMEOUT = 5
 CACHE_TTL = 300  # seconds
 CACHE_MAX_SIZE = 1000
 INLINE_CACHE_TIME = 300  # seconds Telegram caches inline results
+# Pixel-art pin picture for the map result in inline mode: docs/pin.jpg from the repo via the jsDelivr CDN
+PIN_THUMBNAIL_URL = "https://cdn.jsdelivr.net/gh/CraftStick/IPBot-telegram@main/docs/pin.jpg"
+PIN_THUMBNAIL_SIZE = 136
 WHOIS_WAIT = 6  # seconds to wait for WHOIS after the geolocation is ready
 EXPIRY_WARNING_DAYS = 30
 
@@ -84,7 +88,8 @@ def load_token():
     return token
 
 
-bot = telebot.TeleBot(load_token(), parse_mode="HTML")
+# A lookup can block a worker for API_TIMEOUT + WHOIS_WAIT seconds, so keep more than the default 2
+bot = telebot.TeleBot(load_token(), parse_mode="HTML", num_threads=8)
 
 
 @functools.lru_cache(maxsize=None)
@@ -108,7 +113,10 @@ def normalize_query(text):
     """
     query = text.strip()
     if "://" in query:
-        query = urlsplit(query).hostname or ""
+        try:
+            query = urlsplit(query).hostname or ""
+        except ValueError:  # malformed URL, e.g. "http://[::1"
+            return None
     else:
         query = query.split("/")[0]
     query = query.strip()
@@ -145,7 +153,16 @@ def is_ip(query):
         return False
 
 
+def display_domain(domain):
+    """Punycode back to Unicode for showing: xn--e1afmkfd.xn--p1ai -> пример.рф."""
+    try:
+        return domain.encode("ascii").decode("idna")
+    except UnicodeError:
+        return domain
+
+
 _cache = {}  # (query, lang) -> (timestamp, data)
+_cache_lock = threading.Lock()  # handlers run in several worker threads
 
 
 def get_ip_info(query, lang=DEFAULT_LANG):
@@ -159,7 +176,8 @@ def get_ip_info(query, lang=DEFAULT_LANG):
 
     now = time.monotonic()
     cache_key = (query, lang)
-    cached = _cache.get(cache_key)
+    with _cache_lock:
+        cached = _cache.get(cache_key)
     if cached and now - cached[0] < CACHE_TTL:
         return cached[1]
 
@@ -182,12 +200,13 @@ def get_ip_info(query, lang=DEFAULT_LANG):
             raise LookupFailed(API_ERRORS[message])
         raise LookupFailed("err_unknown", message=message)
 
-    if len(_cache) >= CACHE_MAX_SIZE:
-        for key in [k for k, (ts, _) in _cache.items() if now - ts >= CACHE_TTL]:
-            del _cache[key]
+    with _cache_lock:
         if len(_cache) >= CACHE_MAX_SIZE:
-            _cache.clear()
-    _cache[cache_key] = (now, data)
+            for key in [k for k, (ts, _) in _cache.items() if now - ts >= CACHE_TTL]:
+                del _cache[key]
+            if len(_cache) >= CACHE_MAX_SIZE:
+                _cache.clear()
+        _cache[cache_key] = (now, data)
     return data
 
 
@@ -264,31 +283,36 @@ def format_date(value, lang, now):
     return f"{value.strftime(t(lang, 'date_format'))} ({relative})"
 
 
+def row(lang, key, value):
+    """One "<b>Label:</b> value" line of a card section."""
+    return f"<b>{t(lang, key)}:</b> {value}"
+
+
 def format_whois(whois, query, lang, now):
     """Rows of the WHOIS section."""
-
-    def row(key, value):
-        return f"<b>{t(lang, key)}:</b> {value}"
-
     rows = []
     if whois.domain != query:  # data of the parent domain for a subdomain
-        rows.append(row("domain", f"<code>{html.escape(whois.domain)}</code>"))
+        rows.append(row(lang, "domain", f"<code>{html.escape(display_domain(whois.domain))}</code>"))
     if whois.registrar:
-        rows.append(row("registrar", html.escape(whois.registrar)))
+        rows.append(row(lang, "registrar", html.escape(whois.registrar)))
     if whois.created:
-        rows.append(row("registered", format_date(whois.created, lang, now)))
+        rows.append(row(lang, "registered", format_date(whois.created, lang, now)))
     if whois.expires:
         days_left = (whois.expires.date() - now.date()).days
         if days_left < 0:
-            rows.append("⚠️ " + row("expired", whois.expires.strftime(t(lang, "date_format"))))
+            rows.append("⚠️ " + row(lang, "expired", whois.expires.strftime(t(lang, "date_format"))))
         else:
             warning = "⚠️ " if days_left <= EXPIRY_WARNING_DAYS else ""
-            rows.append(warning + row("expires", format_date(whois.expires, lang, now)))
+            rows.append(warning + row(lang, "expires", format_date(whois.expires, lang, now)))
     return rows
 
 
-def format_ip_info(info, query, lang=DEFAULT_LANG, now=None, whois=None):
-    """Format IP information into an HTML message."""
+def format_ip_info(info, query, lang=DEFAULT_LANG, now=None, whois=None, animated=True):
+    """Format IP information into an HTML message.
+
+    animated=False keeps plain emoji: Telegram allows animated (custom) emoji only
+    in messages the bot sends itself, not in ones sent via inline mode.
+    """
     esc = html.escape
     ip = info.get("query", query)
     flag = get_emoji_flag(info.get("countryCode"))
@@ -298,7 +322,7 @@ def format_ip_info(info, query, lang=DEFAULT_LANG, now=None, whois=None):
         version = ""
 
     if query != ip:
-        lines = [f"{flag} <b>{esc(query)}</b>", f"<code>{esc(ip)}</code>{version}"]
+        lines = [f"{flag} <b>{esc(display_domain(query))}</b>", f"<code>{esc(ip)}</code>{version}"]
     else:
         lines = [f"{flag} <code>{esc(ip)}</code>{version}"]
 
@@ -306,62 +330,38 @@ def format_ip_info(info, query, lang=DEFAULT_LANG, now=None, whois=None):
         if rows:
             lines.extend(["", f"{emoji} <b>{t(lang, key)}</b>", "<blockquote>" + "\n".join(rows) + "</blockquote>"])
 
-    def row(key, value):
-        return f"<b>{t(lang, key)}:</b> {value}"
-
     location = []
     place = format_place(info, with_region=True)
     if place:
         location.append(esc(place))
     if info.get("continent"):
-        location.append(row("continent", esc(info["continent"])))
+        location.append(row(lang, "continent", esc(info["continent"])))
     if info.get("zip"):
-        location.append(row("zip", f"<code>{esc(info['zip'])}</code>"))
+        location.append(row(lang, "zip", f"<code>{esc(info['zip'])}</code>"))
     if info.get("timezone"):
-        location.append(row("timezone", format_timezone(info["timezone"], lang, now)))
+        location.append(row(lang, "timezone", format_timezone(info["timezone"], lang, now)))
     if has_coordinates(info):
-        location.append(row("coords", f"<code>{info['lat']}, {info['lon']}</code>"))
-    section("📍", "section_location", location)
+        location.append(row(lang, "coords", f"<code>{info['lat']}, {info['lon']}</code>"))
+    section(PIN_EMOJI if animated else "📍", "section_location", location)
 
     network = []
     if info.get("isp"):
-        network.append(row("isp", esc(info["isp"])))
+        network.append(row(lang, "isp", esc(info["isp"])))
     if info.get("org") and info["org"].lower() != (info.get("isp") or "").lower():
-        network.append(row("org", esc(info["org"])))
+        network.append(row(lang, "org", esc(info["org"])))
     if info.get("as"):
-        network.append(row("as", esc(format_as(info))))
+        network.append(row(lang, "as", esc(format_as(info))))
     if info.get("reverse"):
-        network.append(row("reverse", f"<code>{esc(info['reverse'])}</code>"))
-    section("📡", "section_network", network)
+        network.append(row(lang, "reverse", f"<code>{esc(info['reverse'])}</code>"))
+    section(NETWORK_EMOJI if animated else "📡", "section_network", network)
 
     if whois:
         section("🌐", "section_whois", format_whois(whois, query, lang, now or datetime.now(timezone.utc)))
 
-    tags = [t(lang, f"tag_{name}") for name in ("mobile", "proxy", "hosting") if info.get(name)]
-    if tags:
-        lines += ["", "<blockquote>" + "\n".join(tags) + "</blockquote>"]
+    if info.get("mobile"):
+        lines += ["", f"<blockquote>{t(lang, 'tag_mobile')}</blockquote>"]
 
     return "\n".join(lines)
-
-
-def info_keyboard(info, lang=DEFAULT_LANG):
-    """Inline keyboard with map links (when there are coordinates) and WHOIS."""
-    ip = info["query"]
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    if has_coordinates(info):
-        lat, lon = info["lat"], info["lon"]
-        markup.add(
-            types.InlineKeyboardButton(
-                t(lang, "btn_osm"),
-                url=f"https://www.openstreetmap.org/?mlat={lat}&mlon={lon}#map=12/{lat}/{lon}",
-            ),
-            types.InlineKeyboardButton(
-                t(lang, "btn_gmaps"),
-                url=f"https://maps.google.com/?q={lat},{lon}",
-            ),
-        )
-    markup.add(types.InlineKeyboardButton(t(lang, "btn_whois"), url=f"https://bgp.he.net/ip/{ip}"))
-    return markup
 
 
 def venue_texts(info):
@@ -387,7 +387,6 @@ def reply_with_lookup(message, text):
         return
 
     card = format_ip_info(info, query, lang, whois=whois)
-    markup = info_keyboard(info, lang)
 
     # Telegram can't attach text to a map pin, so the interactive map goes first
     # and the card right below it (without quoting the request a second time)
@@ -401,10 +400,10 @@ def reply_with_lookup(message, text):
         except telebot.apihelper.ApiException as e:
             log.warning("Could not send the map for %s: %s", query, e)
         else:
-            bot.send_message(message.chat.id, card, reply_markup=markup, disable_web_page_preview=True)
+            bot.send_message(message.chat.id, card, disable_web_page_preview=True)
             return
 
-    bot.reply_to(message, card, reply_markup=markup, disable_web_page_preview=True)
+    bot.reply_to(message, card, disable_web_page_preview=True)
 
 
 # ========================================
@@ -412,6 +411,10 @@ def reply_with_lookup(message, text):
 # ========================================
 @bot.message_handler(commands=["start"])
 def start_command(message):
+    # "/start help" comes from the hint button in inline mode
+    if telebot.util.extract_arguments(message.text or "") == "help":
+        help_command(message)
+        return
     lang = get_lang(message.from_user)
     name = html.escape(message.from_user.first_name or "")
     bot.send_message(
@@ -448,24 +451,6 @@ def handle_text(message):
 
 
 # ========================================
-# INLINE BUTTONS
-# ========================================
-# "Send location" button from older cards; new cards send the map right away
-@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith("loc:"))
-def handle_send_location(call):
-    lang = get_lang(call.from_user)
-    try:
-        lat, lon = (float(v) for v in call.data[4:].split(","))
-    except ValueError:
-        bot.answer_callback_query(call.id, t(lang, "bad_coords"))
-        return
-
-    bot.answer_callback_query(call.id)
-    if call.message:
-        bot.send_location(call.message.chat.id, lat, lon, reply_to_message_id=call.message.message_id)
-
-
-# ========================================
 # INLINE MODE (@bot 8.8.8.8 in any chat)
 # ========================================
 @bot.inline_handler(func=lambda inline_query: True)
@@ -489,11 +474,10 @@ def handle_inline_query(inline_query):
                 title=f"{get_emoji_flag(info.get('countryCode'))} {ip}",
                 description=description,
                 input_message_content=types.InputTextMessageContent(
-                    format_ip_info(info, query, lang, whois=whois),
+                    format_ip_info(info, query, lang, whois=whois, animated=False),
                     parse_mode="HTML",
                     disable_web_page_preview=True,
                 ),
-                reply_markup=info_keyboard(info, lang),
             ))
             if has_coordinates(info):
                 title, address = venue_texts(info)
@@ -503,12 +487,18 @@ def handle_inline_query(inline_query):
                     latitude=info["lat"],
                     longitude=info["lon"],
                     address=address,
+                    thumbnail_url=PIN_THUMBNAIL_URL,
+                    thumbnail_width=PIN_THUMBNAIL_SIZE,
+                    thumbnail_height=PIN_THUMBNAIL_SIZE,
                 ))
 
     button = None
     if not results:
         button = types.InlineQueryResultsButton(t(lang, "inline_hint"), start_parameter="help")
-    bot.answer_inline_query(inline_query.id, results, cache_time=INLINE_CACHE_TIME, button=button)
+    # Results depend on the user's language, so Telegram must not share them between users
+    bot.answer_inline_query(
+        inline_query.id, results, cache_time=INLINE_CACHE_TIME, is_personal=True, button=button,
+    )
 
 
 # ========================================

@@ -34,7 +34,7 @@ IPv4, IPv6, domains (even `пример.рф`), links like `https://site.com/pag
 <td width="50%" valign="top">
 
 ### 🗺️ Interactive map
-A Telegram map pin you can pinch and drag comes with every answer, plus OpenStreetMap and Google Maps buttons.
+A Telegram map pin you can pinch and drag comes with every answer.
 
 </td>
 </tr>
@@ -48,7 +48,7 @@ Country with flag, region, city, ZIP code, continent, timezone with the current 
 <td valign="top">
 
 ### 📡 Network
-Internet provider, organization, autonomous system (AS) and hostname (PTR), with a WHOIS / BGP link for the IP.
+Internet provider, organization, autonomous system (AS) and hostname (PTR).
 
 </td>
 </tr>
@@ -61,8 +61,8 @@ Registrar, registration and expiry dates — with a ⚠️ warning when the doma
 </td>
 <td valign="top">
 
-### 🛡️ Address type
-Flags mobile networks, proxies / VPN / Tor and hosting / data center addresses.
+### 📱 Mobile networks
+Flags addresses that belong to mobile networks.
 
 </td>
 </tr>
@@ -165,6 +165,7 @@ IPBot-telegram/
 │   └── requirements.txt
 ├── tests/                  # pytest tests
 ├── docs/preview.svg        # Picture for this README
+├── docs/pin.jpg            # Map pin picture for inline results (served via jsDelivr)
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example            # Token template for Docker

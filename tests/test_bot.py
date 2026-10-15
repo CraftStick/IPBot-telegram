@@ -7,7 +7,7 @@ import telebot
 
 import bot
 from domaininfo import DomainInfo
-from texts import TEXTS, format_duration, get_lang, t
+from texts import NETWORK_EMOJI, PIN_EMOJI, TEXTS, format_duration, get_lang, t
 
 GOOGLE_DNS = {
     "status": "success",
@@ -27,8 +27,6 @@ GOOGLE_DNS = {
     "lat": 39.03,
     "lon": -77.5,
     "mobile": False,
-    "proxy": False,
-    "hosting": True,
 }
 
 
@@ -117,6 +115,7 @@ def make_message(text, lang="en", chat_type="private", via_bot=None):
     ("hello", None),
     ("localhost", None),
     ("-bad-.com", None),
+    ("http://[::1", None),
     ("", None),
 ])
 def test_normalize_query(text, expected):
@@ -182,7 +181,7 @@ NOON_UTC = datetime(2026, 1, 15, 12, 0, tzinfo=timezone.utc)
 def test_format_ip_info_en():
     text = bot.format_ip_info(GOOGLE_DNS, "8.8.8.8", now=NOON_UTC)
     assert text.startswith("🇺🇸 <code>8.8.8.8</code> · IPv4\n")
-    assert "📍 <b>Location</b>\n<blockquote>Ashburn, Virginia, United States\n" in text
+    assert f"{PIN_EMOJI} <b>Location</b>\n<blockquote>Ashburn, Virginia, United States\n" in text
     assert "<b>Continent:</b> North America\n" in text
     assert "<b>ZIP code:</b> <code>20149</code>\n" in text
     assert "<b>Timezone:</b> America/New_York (UTC−5), now 07:00\n" in text
@@ -191,15 +190,26 @@ def test_format_ip_info_en():
     assert "<b>Organization:</b> Google Public DNS" in text
     assert "<b>AS:</b> AS15169 (GOOGLE)\n" in text
     assert "<b>Hostname:</b> <code>dns.google</code></blockquote>" in text
-    assert text.endswith("\n\n<blockquote>🖥️ Hosting / data center</blockquote>")
+    assert text.endswith("<b>Hostname:</b> <code>dns.google</code></blockquote>")  # no tags for non-mobile
+
+
+def test_format_ip_info_marks_mobile_network():
+    text = bot.format_ip_info({**GOOGLE_DNS, "mobile": True}, "8.8.8.8", "ru", now=NOON_UTC)
+    assert text.endswith("\n\n<blockquote>📱 Мобильная сеть</blockquote>")
 
 
 def test_format_ip_info_ru_with_domain():
     text = bot.format_ip_info(GOOGLE_DNS, "dns.google", "ru", now=NOON_UTC)
     assert text.startswith("🇺🇸 <b>dns.google</b>\n<code>8.8.8.8</code> · IPv4\n")
-    assert "📍 <b>Местоположение</b>" in text
+    assert f"{PIN_EMOJI} <b>Местоположение</b>" in text
+    assert f"{NETWORK_EMOJI} <b>Сеть</b>" in text
     assert "сейчас 07:00" in text
     assert "<b>Провайдер:</b> Google LLC" in text
+
+
+def test_format_ip_info_shows_idn_domain_in_unicode():
+    text = bot.format_ip_info(GOOGLE_DNS, "xn--e1afmkfd.xn--p1ai", "ru", now=NOON_UTC)
+    assert text.startswith("🇺🇸 <b>пример.рф</b>\n")
 
 
 def test_format_skips_empty_and_repeated_values():
@@ -232,15 +242,6 @@ def test_format_escapes_html_and_keeps_zero_coordinates():
     text = bot.format_ip_info(info, "1.1.1.1")
     assert "&lt;b&gt;Evil&lt;/b&gt; &amp; Co" in text
     assert "<code>0, 0</code>" in text
-    assert len(bot.info_keyboard(info).to_dict()["inline_keyboard"]) == 2
-
-
-def test_info_keyboard():
-    whois = {"text": "🔎 WHOIS / BGP", "url": "https://bgp.he.net/ip/1.1.1.1"}
-    assert bot.info_keyboard({"query": "1.1.1.1"}).to_dict()["inline_keyboard"] == [[whois]]
-    maps, (whois_button,) = bot.info_keyboard(GOOGLE_DNS, "ru").to_dict()["inline_keyboard"]
-    assert [b["text"] for b in maps] == ["🗺️ OpenStreetMap", "🌍 Google Maps"]
-    assert whois_button["url"] == "https://bgp.he.net/ip/8.8.8.8"
 
 
 def test_venue_texts():
@@ -324,7 +325,7 @@ def test_map_pin_then_card(api, sent):
     assert venue_kwargs["reply_to_message_id"] == 7  # only the map quotes the request
     _, args, kwargs = sent[1]
     assert args[0] == 1 and "Ashburn" in args[1]
-    assert kwargs["reply_markup"] is not None
+    assert "reply_markup" not in kwargs  # no buttons under the card
 
 
 def test_map_failure_still_sends_card(api, sent, monkeypatch):
@@ -382,9 +383,20 @@ def test_inline_query_results(api, sent):
     assert method == "answer_inline_query"
     assert [r.type for r in results] == ["article", "venue"]
     assert results[1].title == "Ashburn, Virginia, United States"
+    assert results[1].thumbnail_url == bot.PIN_THUMBNAIL_URL
     assert results[0].title == "🇺🇸 8.8.8.8"
-    assert "Местоположение" in results[0].input_message_content.message_text
+    message_text = results[0].input_message_content.message_text
+    assert "📍 <b>Местоположение</b>" in message_text
+    assert "📡 <b>Сеть</b>" in message_text
+    assert "<tg-emoji" not in message_text  # animated emoji only work in the bot's own messages
+    assert results[0].reply_markup is None
     assert kwargs["button"] is None
+    assert kwargs["is_personal"] is True  # results are localized per user
+
+
+def test_start_help_from_inline_button_shows_help(sent):
+    bot.start_command(make_message("/start help"))
+    assert sent[0][1][1] == t("en", "help", bot="test_bot")
 
 
 def test_inline_query_invalid_shows_hint(api, sent):

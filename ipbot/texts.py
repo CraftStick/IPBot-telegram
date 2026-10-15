@@ -4,13 +4,20 @@ DEFAULT_LANG = "en"
 
 EXAMPLES = "<code>8.8.8.8</code>, <code>2606:4700::1111</code>, <code>google.com</code>"
 
+# Animated (custom) emoji. They need the bot owner to have Telegram Premium;
+# otherwise Telegram shows the plain emoji inside the tag.
+WAVE_EMOJI = '<tg-emoji emoji-id="5222459157084411333">👋</tg-emoji>'
+CHAT_EMOJI = '<tg-emoji emoji-id="5294450432532323035">💬</tg-emoji>'
+PIN_EMOJI = '<tg-emoji emoji-id="5226924660351840411">📍</tg-emoji>'
+NETWORK_EMOJI = '<tg-emoji emoji-id="5426842241085743267">🤪</tg-emoji>'  # replaces 📡 in the Network header
+
 TEXTS = {
     "en": {
         "start": (
-            "👋 Hello, {name}!\n\n"
+            WAVE_EMOJI + " Hello, {name}!\n\n"
             "Send me an <b>IP address</b> or a <b>domain</b> and I'll show its location, "
             "provider and more.\n\nExamples: {examples}\n\n"
-            "💬 Works in any chat too: type <code>@{bot} 8.8.8.8</code>"
+            + CHAT_EMOJI + " Works in any chat too: type <code>@{bot} 8.8.8.8</code>"
         ),
         "help": (
             "📚 <b>How to use</b>\n\n"
@@ -28,7 +35,7 @@ TEXTS = {
             "• Internet provider, organization and AS\n"
             "• Hostname (PTR)\n"
             "• Domain registrar and registration dates (WHOIS)\n"
-            "• Mobile / proxy / hosting flags"
+            "• Mobile network flag"
         ),
         "need_address": "Send an address after the command, e.g. <code>/ip 8.8.8.8</code>\nExamples: {examples}",
         "unknown_command": "🤖 Unknown command. See /help",
@@ -55,12 +62,6 @@ TEXTS = {
         "today": "today",
         "date_format": "%Y-%m-%d",
         "tag_mobile": "📱 Mobile network",
-        "tag_proxy": "🛡️ Proxy / VPN / Tor",
-        "tag_hosting": "🖥️ Hosting / data center",
-        "btn_osm": "🗺️ OpenStreetMap",
-        "btn_gmaps": "🌍 Google Maps",
-        "btn_whois": "🔎 WHOIS / BGP",
-        "bad_coords": "❌ Invalid coordinates",
         "err_private": "This is a private network address, it has no public location.",
         "err_reserved": "This is a reserved address, it has no public location.",
         "err_invalid": "Could not resolve this IP address or domain.",
@@ -74,10 +75,10 @@ TEXTS = {
     },
     "ru": {
         "start": (
-            "👋 Привет, {name}!\n\n"
+            WAVE_EMOJI + " Привет, {name}!\n\n"
             "Отправь мне <b>IP-адрес</b> или <b>домен</b>, и я покажу, где он находится, "
             "кто провайдер и многое другое.\n\nПримеры: {examples}\n\n"
-            "💬 Работаю и в любом чате: напиши <code>@{bot} 8.8.8.8</code>"
+            + CHAT_EMOJI + " Работаю и в любом чате: напиши <code>@{bot} 8.8.8.8</code>"
         ),
         "help": (
             "📚 <b>Как пользоваться</b>\n\n"
@@ -95,7 +96,7 @@ TEXTS = {
             "• Провайдера, организацию и AS\n"
             "• Имя хоста (PTR)\n"
             "• Регистратора и даты регистрации домена (WHOIS)\n"
-            "• Признаки мобильной сети / прокси / хостинга"
+            "• Признак мобильной сети"
         ),
         "need_address": "Укажи адрес после команды, например <code>/ip 8.8.8.8</code>\nПримеры: {examples}",
         "unknown_command": "🤖 Неизвестная команда. Смотри /help",
@@ -122,12 +123,6 @@ TEXTS = {
         "today": "сегодня",
         "date_format": "%d.%m.%Y",
         "tag_mobile": "📱 Мобильная сеть",
-        "tag_proxy": "🛡️ Прокси / VPN / Tor",
-        "tag_hosting": "🖥️ Хостинг / дата-центр",
-        "btn_osm": "🗺️ OpenStreetMap",
-        "btn_gmaps": "🌍 Google Maps",
-        "btn_whois": "🔎 WHOIS / BGP",
-        "bad_coords": "❌ Неверные координаты",
         "err_private": "Это адрес частной сети, у него нет публичного местоположения.",
         "err_reserved": "Это зарезервированный адрес, у него нет публичного местоположения.",
         "err_invalid": "Не удалось найти такой IP-адрес или домен.",

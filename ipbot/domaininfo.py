@@ -185,8 +185,13 @@ _server_down_until = {}  # WHOIS server -> monotonic time to try it again
 
 def whois_lookup(domain, tld):
     """Ask the registry's WHOIS server, falling back to mirrors if it is unreachable."""
-    servers = [s for s in (whois_server(tld), *WHOIS_FALLBACK_SERVERS.get(tld, ())) if s]
     error = None
+    try:
+        main_server = whois_server(tld)
+    except OSError as e:  # IANA is unreachable: the fallback servers may still answer
+        log.warning("Could not get the WHOIS server of .%s from IANA: %s", tld, e)
+        main_server, error = None, e
+    servers = [s for s in (main_server, *WHOIS_FALLBACK_SERVERS.get(tld, ())) if s]
     for server in servers:
         if _server_down_until.get(server, 0) > time.monotonic():
             continue
@@ -221,15 +226,24 @@ def lookup_domain(domain):
     # mail.example.co.uk -> mail.example.co.uk, example.co.uk, co.uk
     candidates = [".".join(labels[i:]) for i in range(max(0, len(labels) - MAX_LEVELS), len(labels) - 1)]
 
-    result = None
-    try:
-        server = rdap_servers().get(tld)
-        for candidate in candidates:
+    server = rdap_servers().get(tld)
+    result, error = None, None
+    for candidate in candidates:
+        try:
             result = rdap_lookup(server, candidate) if server else whois_lookup(candidate, tld)
-            if result:
-                break
-    except (requests.RequestException, OSError, ValueError) as e:
-        log.warning("Domain lookup for %s failed: %s", domain, e)
+        except (requests.RequestException, OSError, ValueError) as e:
+            # Keep going: a registry can fail on a subdomain it doesn't know
+            # (rdap.verisign.com breaks the TLS connection after its 404) and still answer for the parent
+            log.warning("Domain lookup for %s failed: %s", candidate, e)
+            error = e
+            continue
+        except (KeyError, IndexError, TypeError, AttributeError) as e:  # unexpected RDAP JSON shape
+            log.warning("Unexpected registration data for %s: %r", candidate, e)
+            continue
+        if result:
+            break
+
+    if result is None and error:
         return None  # don't cache network errors
 
     if len(_cache) >= CACHE_MAX_SIZE:

@@ -168,3 +168,34 @@ def test_lookup_unknown_tld(monkeypatch):
     monkeypatch.setattr(domaininfo, "rdap_servers", lambda: {})
     monkeypatch.setattr(domaininfo, "whois_query", lambda server, query: "domain: LOCAL\n")
     assert domaininfo.lookup_domain("example.local") is None
+
+
+def test_lookup_uses_backup_server_when_iana_is_down(monkeypatch):
+    monkeypatch.setattr(domaininfo, "rdap_servers", lambda: {})
+
+    def fake_whois(server, query):
+        if server == domaininfo.IANA_WHOIS_SERVER:
+            raise TimeoutError("timed out")
+        return RU_WHOIS
+
+    monkeypatch.setattr(domaininfo, "whois_query", fake_whois)
+    assert domaininfo.lookup_domain("yandex.ru").registrar == "RU-CENTER-RU"
+
+
+def test_lookup_survives_malformed_rdap(monkeypatch):
+    monkeypatch.setattr(domaininfo, "rdap_servers", lambda: {"com": "https://rdap.example/"})
+    bad = {"entities": [{"roles": ["registrar"], "vcardArray": ["vcard"]}]}
+    monkeypatch.setattr(domaininfo.requests, "get", lambda *a, **k: FakeResponse(bad))
+    assert domaininfo.lookup_domain("google.com") is None
+
+
+def test_lookup_tries_parent_after_subdomain_error(monkeypatch):
+    monkeypatch.setattr(domaininfo, "rdap_servers", lambda: {"com": "https://rdap.example/"})
+
+    def fake_get(url, headers=None, timeout=None):
+        if url.endswith("/domain/mail.google.com"):
+            raise requests.exceptions.SSLError("bad record mac")  # what rdap.verisign.com does
+        return FakeResponse(RDAP_JSON)
+
+    monkeypatch.setattr(domaininfo.requests, "get", fake_get)
+    assert domaininfo.lookup_domain("mail.google.com").registrar == "MarkMonitor Inc."

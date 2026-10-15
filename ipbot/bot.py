@@ -6,6 +6,7 @@ import ipaddress
 import logging
 import os
 import re
+import socket
 import sys
 import threading
 import time
@@ -27,16 +28,23 @@ logging.basicConfig(
 )
 log = logging.getLogger("ipbot")
 
-# ip-api.com free tier: HTTP only, 45 requests per minute for the whole bot
+# ip-api.com free tier: HTTP only, 45 requests per minute for the whole bot.
+# An IP that keeps asking after a 429 gets banned for an hour, so the bot stops before the limit.
 API_URL = "http://ip-api.com/json/{}"
 API_FIELDS = (
     "status,message,query,continent,country,countryCode,regionName,city,district,zip,"
     "timezone,isp,org,as,asname,reverse,lat,lon,mobile"
 )
 API_TIMEOUT = 5
+API_RESERVE = 10  # requests of ip-api's minute that inline mode leaves for messages and commands
+# Backup when ip-api is down or out of requests: HTTPS, no key, 1000 requests a day.
+# It takes only IP addresses and has no hostname (PTR) or mobile network flag.
+FALLBACK_URL = "https://ipwho.is/{}"
+FALLBACK_RETRY_AFTER = 3600  # seconds to skip ipwho.is after a 429 without Retry-After
 CACHE_TTL = 300  # seconds
 CACHE_MAX_SIZE = 1000
 INLINE_CACHE_TIME = 300  # seconds Telegram caches inline results
+INLINE_DEBOUNCE = 0.6  # seconds; Telegram sends inline queries while the user is still typing
 # Pixel-art pin picture for the map result in inline mode: docs/pin.jpg from the repo via the jsDelivr CDN
 PIN_THUMBNAIL_URL = "https://cdn.jsdelivr.net/gh/CraftStick/IPBot-telegram@main/docs/pin.jpg"
 PIN_THUMBNAIL_SIZE = 136
@@ -67,6 +75,11 @@ class LookupFailed(Exception):
     def text(self, lang):
         return t(lang, self.key, **{k: html.escape(str(v)) for k, v in self.params.items()})
 
+    @property
+    def temporary(self):
+        """The service is down or out of requests, so another one may still answer."""
+        return self.key in ("err_rate_limit", "err_unavailable")
+
 
 def load_token():
     """Read the bot token from the BOT_TOKEN env variable or config.py."""
@@ -88,8 +101,10 @@ def load_token():
     return token
 
 
-# A lookup can block a worker for API_TIMEOUT + WHOIS_WAIT seconds, so keep more than the default 2
-bot = telebot.TeleBot(load_token(), parse_mode="HTML", num_threads=8)
+# A lookup can block a worker for two API_TIMEOUTs (ip-api, then the backup) + WHOIS_WAIT seconds
+# and every inline query waits INLINE_DEBOUNCE, so keep far more than the default 2
+bot = telebot.TeleBot(load_token(), parse_mode="HTML", num_threads=16)
+NO_PREVIEW = types.LinkPreviewOptions(is_disabled=True)
 
 
 @functools.lru_cache(maxsize=None)
@@ -161,31 +176,66 @@ def display_domain(domain):
         return domain
 
 
-_cache = {}  # (query, lang) -> (timestamp, data)
-_cache_lock = threading.Lock()  # handlers run in several worker threads
-
-
-def get_ip_info(query, lang=DEFAULT_LANG):
-    """Get geolocation data for a normalized IP address or domain (cached)."""
-    try:
-        ip = ipaddress.ip_address(query)
-    except ValueError:
-        ip = None  # a domain
-    if ip is not None and not ip.is_global:
+def check_public(ip):
+    """Private and reserved addresses have no public location."""
+    ip = ipaddress.ip_address(ip)
+    if not ip.is_global:
         raise LookupFailed("err_private" if ip.is_private else "err_reserved")
 
-    now = time.monotonic()
-    cache_key = (query, lang)
-    with _cache_lock:
-        cached = _cache.get(cache_key)
-    if cached and now - cached[0] < CACHE_TTL:
-        return cached[1]
+
+def resolve(domain):
+    """The domain's IPv4 address (IPv6 if it has none) for services that take only IPs."""
+    try:
+        addresses = socket.getaddrinfo(domain, None, type=socket.SOCK_STREAM)
+    except (socket.gaierror, UnicodeError):
+        raise LookupFailed("err_invalid")
+    sockaddr = min(addresses, key=lambda a: a[0] != socket.AF_INET)[4]
+    return sockaddr[0]
+
+
+class Quota:
+    """Requests a service still allows until its limit window resets."""
+
+    def __init__(self):
+        self.remaining = None  # unknown until the service tells
+        self.reset_at = 0.0
+        self.lock = threading.Lock()  # handlers run in several worker threads
+
+    def take(self, reserve=0):
+        """Count one request; False if it would leave fewer than `reserve` requests."""
+        with self.lock:
+            if self.remaining is None or time.monotonic() >= self.reset_at:
+                return True
+            if self.remaining <= reserve:
+                return False
+            self.remaining -= 1
+            return True
+
+    def update(self, remaining, reset_in):
+        with self.lock:
+            self.remaining = remaining
+            self.reset_at = time.monotonic() + reset_in
+
+
+_ipapi_quota = Quota()
+_fallback_quota = Quota()
+
+
+def ipapi_lookup(query, lang, reserve=0):
+    """Geolocation from ip-api.com for an IP address or domain."""
+    if not _ipapi_quota.take(reserve):
+        raise LookupFailed("err_rate_limit")
 
     params = {"fields": API_FIELDS}
     if lang != DEFAULT_LANG:
         params["lang"] = lang  # localized country/region/city names
     try:
         response = requests.get(API_URL.format(query), params=params, timeout=API_TIMEOUT)
+        try:  # requests left in the current minute and seconds until it ends
+            _ipapi_quota.update(int(response.headers["X-Rl"]), int(response.headers["X-Ttl"]))
+        except (KeyError, ValueError):
+            if response.status_code == 429:
+                _ipapi_quota.update(0, 60)
         if response.status_code == 429:
             raise LookupFailed("err_rate_limit")
         response.raise_for_status()
@@ -199,6 +249,83 @@ def get_ip_info(query, lang=DEFAULT_LANG):
         if message in API_ERRORS:
             raise LookupFailed(API_ERRORS[message])
         raise LookupFailed("err_unknown", message=message)
+    return data
+
+
+def fallback_lookup(query, lang):
+    """Geolocation from ipwho.is, converted to ip-api's fields."""
+    ip = query if is_ip(query) else resolve(query)
+    check_public(ip)
+    if not _fallback_quota.take():
+        raise LookupFailed("err_rate_limit")
+
+    params = {"lang": lang} if lang != DEFAULT_LANG else {}
+    try:
+        response = requests.get(FALLBACK_URL.format(ip), params=params, timeout=API_TIMEOUT)
+        if response.status_code == 429:  # the limit is per day, Retry-After says until when
+            retry_after = response.headers.get("Retry-After", "")
+            _fallback_quota.update(0, int(retry_after) if retry_after.isdigit() else FALLBACK_RETRY_AFTER)
+            raise LookupFailed("err_rate_limit")
+        response.raise_for_status()
+        data = response.json()
+    except (requests.RequestException, ValueError) as e:
+        log.warning("ipwho.is request for %s failed: %s", ip, e)
+        raise LookupFailed("err_unavailable")
+
+    if not data.get("success"):
+        log.warning("ipwho.is lookup for %s failed: %s", ip, data.get("message"))
+        raise LookupFailed("err_unavailable")
+
+    connection = data.get("connection") or {}
+    return {
+        "query": data.get("ip") or ip,
+        "continent": data.get("continent"),
+        "country": data.get("country"),
+        "countryCode": data.get("country_code"),
+        "regionName": data.get("region"),
+        "city": data.get("city"),
+        "zip": data.get("postal"),
+        "timezone": (data.get("timezone") or {}).get("id"),
+        "isp": connection.get("isp"),
+        "org": connection.get("org"),
+        "as": f"AS{connection['asn']}" if connection.get("asn") else None,
+        "lat": data.get("latitude"),
+        "lon": data.get("longitude"),
+    }
+
+
+_cache = {}  # (query, lang) -> (timestamp, data)
+_cache_lock = threading.Lock()  # handlers run in several worker threads
+
+
+def get_ip_info(query, lang=DEFAULT_LANG, reserve=0):
+    """Get geolocation data for a normalized IP address or domain (cached).
+
+    Asks ip-api.com and, when it is down or out of requests, ipwho.is. `reserve` requests
+    of ip-api's minute are left for other callers.
+    """
+    if is_ip(query):
+        check_public(query)
+
+    now = time.monotonic()
+    cache_key = (query, lang)
+    with _cache_lock:
+        cached = _cache.get(cache_key)
+    if cached and now - cached[0] < CACHE_TTL:
+        return cached[1]
+
+    try:
+        data = ipapi_lookup(query, lang, reserve)
+    except LookupFailed as e:
+        if not e.temporary:
+            raise
+        try:
+            data = fallback_lookup(query, lang)
+        except LookupFailed as fallback_error:
+            # The backup's own outage says less than why ip-api didn't answer
+            if fallback_error.temporary:
+                raise e from fallback_error
+            raise
 
     with _cache_lock:
         if len(_cache) >= CACHE_MAX_SIZE:
@@ -213,10 +340,10 @@ def get_ip_info(query, lang=DEFAULT_LANG):
 _whois_pool = ThreadPoolExecutor(max_workers=4)
 
 
-def lookup(query, lang=DEFAULT_LANG):
+def lookup(query, lang=DEFAULT_LANG, reserve=0):
     """Geolocation and, for domains, WHOIS data (fetched in parallel). Raises LookupFailed."""
     whois_future = None if is_ip(query) else _whois_pool.submit(domaininfo.lookup_domain, query)
-    info = get_ip_info(query, lang)
+    info = get_ip_info(query, lang, reserve)
 
     whois = None
     if whois_future:
@@ -391,15 +518,15 @@ def reply_with_lookup(message, text):
         try:
             bot.send_venue(
                 message.chat.id, info["lat"], info["lon"], title, address,
-                reply_to_message_id=message.message_id,
+                reply_parameters=types.ReplyParameters(message.message_id),
             )
         except telebot.apihelper.ApiException as e:
             log.warning("Could not send the map for %s: %s", query, e)
         else:
-            bot.send_message(message.chat.id, card, disable_web_page_preview=True)
+            bot.send_message(message.chat.id, card, link_preview_options=NO_PREVIEW)
             return
 
-    bot.reply_to(message, card, disable_web_page_preview=True)
+    bot.reply_to(message, card, link_preview_options=NO_PREVIEW)
 
 
 # ========================================
@@ -417,7 +544,7 @@ def start_command(message):
         message.chat.id,
         t(lang, "start", name=name, bot=bot_username()),
         reply_markup=types.ReplyKeyboardRemove(),  # remove the keyboard from older bot versions
-        disable_web_page_preview=True,
+        link_preview_options=NO_PREVIEW,
     )
 
 
@@ -449,6 +576,27 @@ def handle_text(message):
 # ========================================
 # INLINE MODE (@bot 8.8.8.8 in any chat)
 # ========================================
+_latest_inline = {}  # user id -> id of their latest inline query
+_latest_inline_lock = threading.Lock()
+
+
+def typing_paused(inline_query):
+    """Wait a moment; False if the user typed on and a newer query replaced this one.
+
+    "google.co" is a valid domain too, so without the pause every step of typing
+    "google.com" would cost an ip-api request and a WHOIS lookup.
+    """
+    user_id = inline_query.from_user.id
+    with _latest_inline_lock:
+        _latest_inline[user_id] = inline_query.id
+    time.sleep(INLINE_DEBOUNCE)
+    with _latest_inline_lock:
+        if _latest_inline.get(user_id) != inline_query.id:
+            return False
+        del _latest_inline[user_id]
+        return True
+
+
 @bot.inline_handler(func=lambda inline_query: True)
 def handle_inline_query(inline_query):
     lang = get_lang(inline_query.from_user)
@@ -456,8 +604,10 @@ def handle_inline_query(inline_query):
     results = []
 
     if query:
+        if not typing_paused(inline_query):
+            return  # the user's chat already shows the newer query, which gets the answer
         try:
-            info, whois = lookup(query, lang)
+            info, whois = lookup(query, lang, reserve=API_RESERVE)
         except LookupFailed:
             info, whois = None, None
 
@@ -472,7 +622,7 @@ def handle_inline_query(inline_query):
                 input_message_content=types.InputTextMessageContent(
                     format_ip_info(info, query, lang, whois=whois),
                     parse_mode="HTML",
-                    disable_web_page_preview=True,
+                    link_preview_options=NO_PREVIEW,
                 ),
             ))
             if has_coordinates(info):

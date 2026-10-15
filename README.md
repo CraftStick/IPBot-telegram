@@ -4,6 +4,8 @@
 
 **A Telegram bot that tells you everything about an IP address or domain**
 
+[![Tests](https://github.com/CraftStick/IPBot-telegram/actions/workflows/tests.yml/badge.svg)](https://github.com/CraftStick/IPBot-telegram/actions/workflows/tests.yml)
+
 Location on an interactive map · provider & AS · WHOIS · inline mode · 🇬🇧 English / 🇷🇺 Russian
 
 [Features](#-features) •
@@ -143,12 +145,15 @@ In groups the bot answers only to commands, so it doesn't react to every message
 
 | Data | Source | Notes |
 |:--|:--|:--|
-| Geolocation, ISP, AS, PTR, flags | [ip-api.com](https://ip-api.com) | Free, no key; 45 requests/min per bot — answers are cached for 5 min |
+| Geolocation, ISP, AS, PTR, flags | [ip-api.com](https://ip-api.com) | Free, no key; 45 requests/min per bot — answers are cached for 5 min, and the bot stops before the limit using the quota ip-api reports |
+| Backup geolocation | [ipwho.is](https://ipwho.is) | Used when ip-api is down or out of requests; free, no key, 1,000 requests/day; no hostname (PTR) or mobile flag |
 | Domain registration | [RDAP](https://about.rdap.org/) → classic WHOIS | RDAP where the zone supports it, otherwise port-43 WHOIS; `whois.nic.ru` as a backup for `.ru` / `.рф` / `.su` |
 | Local time | [`tzdata`](https://pypi.org/project/tzdata/) | Works the same on Linux, macOS, Windows and in Docker |
 | Telegram | [`pyTelegramBotAPI`](https://pypi.org/project/pyTelegramBotAPI/) | Long polling, no webhook or public server needed |
 
 WHOIS is requested in parallel with the geolocation, so domains don't wait twice. Private and reserved addresses (`192.168.x.x`, `10.x.x.x`, `127.0.0.1`…) are rejected right away — they have no public location.
+
+Inline mode waits for a short pause in typing before looking anything up, so `google.co` on the way to `google.com` doesn't cost a request, and it leaves the last 10 ip-api requests of each minute to messages and commands.
 
 <details>
 <summary><b>📁 Project structure</b></summary>
@@ -164,6 +169,7 @@ IPBot-telegram/
 │   ├── config.example.py   # Config template (copy to config.py)
 │   └── requirements.txt
 ├── tests/                  # pytest tests
+├── .github/                # CI (tests on every push) and Dependabot updates
 ├── docs/preview.svg        # Picture for this README
 ├── docs/pin.jpg            # Map pin picture for inline results (served via jsDelivr)
 ├── Dockerfile
@@ -184,7 +190,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-Tests need neither a bot token nor internet access: Telegram, ip-api and WHOIS servers are mocked.
+Tests need neither a bot token nor internet access: Telegram, ip-api, ipwho.is, DNS and WHOIS servers are mocked.
 
 </details>
 
@@ -228,7 +234,7 @@ Some zones (e.g. `.de`) don't publish registration dates at all. For `.ru` / `.�
 | `Unauthorized` on start | The token is wrong — get a new one from @BotFather |
 | No answer to `/start` | Make sure the bot is running and the machine has internet access |
 | `@your_bot` shows nothing in chats | Inline mode is off — enable it with `/setinline` in @BotFather |
-| "Too many requests" | The ip-api limit (45 requests/min for the whole bot) was hit — wait a minute |
+| "Too many requests" | Both ip-api (45 requests/min) and the ipwho.is backup (1,000/day) are out of requests — wait a minute |
 
 </details>
 

@@ -1,3 +1,4 @@
+import socket
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
@@ -30,10 +31,29 @@ GOOGLE_DNS = {
 }
 
 
+# The same address as ipwho.is answers it
+IPWHOIS_GOOGLE = {
+    "ip": "8.8.8.8",
+    "success": True,
+    "type": "IPv4",
+    "continent": "North America",
+    "country": "United States",
+    "country_code": "US",
+    "region": "California",
+    "city": "San Jose",
+    "latitude": 37.34,
+    "longitude": -121.89,
+    "postal": "95025",
+    "connection": {"asn": 15169, "org": "Google LLC", "isp": "Google LLC", "domain": "google.com"},
+    "timezone": {"id": "America/Los_Angeles", "abbr": "PDT", "offset": -25200, "utc": "-07:00"},
+}
+
+
 class FakeResponse:
-    def __init__(self, data=None, status_code=200):
+    def __init__(self, data=None, status_code=200, headers=None):
         self.data = data
         self.status_code = status_code
+        self.headers = headers or {}
 
     def raise_for_status(self):
         if self.status_code >= 400:
@@ -44,8 +64,30 @@ class FakeResponse:
 
 
 @pytest.fixture(autouse=True)
-def clear_cache():
+def reset_state(monkeypatch):
     bot._cache.clear()
+    bot._latest_inline.clear()
+    monkeypatch.setattr(bot, "_ipapi_quota", bot.Quota())
+    monkeypatch.setattr(bot, "_fallback_quota", bot.Quota())
+    monkeypatch.setattr(bot, "INLINE_DEBOUNCE", 0)
+
+
+@pytest.fixture(autouse=True)
+def dns(monkeypatch):
+    """Resolver without network: every domain is 8.8.8.8 unless dns.records says otherwise."""
+    state = SimpleNamespace(records={})
+
+    def getaddrinfo(host, port, type=0):
+        addresses = state.records.get(host, ["8.8.8.8"])
+        if not addresses:
+            raise socket.gaierror(socket.EAI_NONAME, "Name or service not known")
+        return [
+            (socket.AF_INET6 if ":" in a else socket.AF_INET, type, 6, "", (a, 0))
+            for a in addresses
+        ]
+
+    monkeypatch.setattr(bot.socket, "getaddrinfo", getaddrinfo)
+    return state
 
 
 @pytest.fixture(autouse=True)
@@ -63,14 +105,25 @@ def whois(monkeypatch):
 
 @pytest.fixture
 def api(monkeypatch):
-    """Replace ip-api with a fake; set api.response and inspect api.calls."""
-    state = SimpleNamespace(response=FakeResponse(GOOGLE_DNS), calls=[])
+    """Replace ip-api and the ipwho.is backup with fakes.
+
+    Set api.response / api.fallback, inspect api.calls / api.fallback_calls.
+    The backup is offline unless a test sets it.
+    """
+    state = SimpleNamespace(
+        response=FakeResponse(GOOGLE_DNS), calls=[],
+        fallback=requests.ConnectionError("offline"), fallback_calls=[],
+    )
 
     def fake_get(url, params=None, timeout=None):
-        state.calls.append((url, params))
-        if isinstance(state.response, Exception):
-            raise state.response
-        return state.response
+        if url.startswith(bot.FALLBACK_URL.format("")):
+            response, calls = state.fallback, state.fallback_calls
+        else:
+            response, calls = state.response, state.calls
+        calls.append((url, params))
+        if isinstance(response, Exception):
+            raise response
+        return response
 
     monkeypatch.setattr(bot.requests, "get", fake_get)
     return state
@@ -97,6 +150,10 @@ def make_message(text, lang="en", chat_type="private", via_bot=None):
         chat=SimpleNamespace(id=1, type=chat_type),
         from_user=SimpleNamespace(first_name="Ann", language_code=lang),
     )
+
+
+def make_inline_query(text, lang="en", query_id="q1"):
+    return SimpleNamespace(id=query_id, query=text, from_user=SimpleNamespace(id=42, language_code=lang))
 
 
 # ---------- input parsing ----------
@@ -166,11 +223,132 @@ def test_lookup_errors(api, response, key):
 
 
 def test_errors_are_not_cached(api):
-    api.response = FakeResponse(status_code=429)
+    api.response = FakeResponse(status_code=503)
     with pytest.raises(bot.LookupFailed):
         bot.get_ip_info("8.8.8.8")
     api.response = FakeResponse(GOOGLE_DNS)
     assert bot.get_ip_info("8.8.8.8") == GOOGLE_DNS
+
+
+# ---------- ip-api limit ----------
+
+def test_stops_before_ipapi_limit(api):
+    api.response = FakeResponse(GOOGLE_DNS, headers={"X-Rl": "0", "X-Ttl": "30"})
+    bot.get_ip_info("8.8.8.8")  # the last request of this minute
+    with pytest.raises(bot.LookupFailed) as e:
+        bot.get_ip_info("1.1.1.1")
+    assert e.value.key == "err_rate_limit"
+    assert len(api.calls) == 1  # no request that would get a 429 and then a ban
+    assert len(api.fallback_calls) == 1
+
+
+def test_ipapi_limit_resets_with_the_minute(api):
+    api.response = FakeResponse(GOOGLE_DNS, headers={"X-Rl": "0", "X-Ttl": "0"})
+    bot.get_ip_info("8.8.8.8")
+    bot.get_ip_info("1.1.1.1")
+    assert len(api.calls) == 2
+
+
+def test_429_without_headers_pauses_ipapi(api):
+    api.response = FakeResponse(status_code=429)
+    for ip in ("8.8.8.8", "1.1.1.1"):
+        with pytest.raises(bot.LookupFailed):
+            bot.get_ip_info(ip)
+    assert len(api.calls) == 1
+
+
+def test_reserve_goes_to_backup(api):
+    api.response = FakeResponse(GOOGLE_DNS, headers={"X-Rl": "10", "X-Ttl": "30"})
+    api.fallback = FakeResponse(IPWHOIS_GOOGLE)
+    bot.get_ip_info("8.8.8.8")
+    bot.get_ip_info("1.1.1.1", reserve=10)
+    assert len(api.calls) == 1 and len(api.fallback_calls) == 1
+    bot.get_ip_info("9.9.9.9")
+    assert len(api.calls) == 2
+
+
+# ---------- backup service ----------
+
+def test_backup_when_ipapi_is_down(api):
+    api.response = FakeResponse(status_code=503)
+    api.fallback = FakeResponse(IPWHOIS_GOOGLE)
+    assert bot.get_ip_info("8.8.8.8", "ru") == {
+        "query": "8.8.8.8",
+        "continent": "North America",
+        "country": "United States",
+        "countryCode": "US",
+        "regionName": "California",
+        "city": "San Jose",
+        "zip": "95025",
+        "timezone": "America/Los_Angeles",
+        "isp": "Google LLC",
+        "org": "Google LLC",
+        "as": "AS15169",
+        "lat": 37.34,
+        "lon": -121.89,
+    }
+    assert api.fallback_calls == [("https://ipwho.is/8.8.8.8", {"lang": "ru"})]
+    assert bot.get_ip_info("8.8.8.8", "ru")["city"] == "San Jose"  # cached
+    assert len(api.calls) == 1
+
+
+def test_backup_card(api):
+    api.response = FakeResponse(status_code=503)
+    api.fallback = FakeResponse(IPWHOIS_GOOGLE)
+    text = bot.format_ip_info(bot.get_ip_info("8.8.8.8"), "8.8.8.8", now=NOON_UTC)
+    assert "<blockquote>San Jose, California, United States\n" in text
+    assert "<b>Timezone:</b> America/Los_Angeles (UTC−8), now 04:00\n" in text
+    assert "📡 <b>Network</b>\n<blockquote><b>ISP:</b> Google LLC\n<b>AS:</b> AS15169</blockquote>" in text
+
+
+def test_backup_resolves_domains_preferring_ipv4(api, dns):
+    api.response = requests.ConnectionError("offline")
+    api.fallback = FakeResponse(IPWHOIS_GOOGLE)
+    dns.records["google.com"] = ["2607:f8b0:4004:c1b::64", "142.250.1.1"]
+    bot.get_ip_info("google.com")
+    assert api.fallback_calls[0][0] == "https://ipwho.is/142.250.1.1"
+
+
+@pytest.mark.parametrize("addresses, key", [([], "err_invalid"), (["192.168.1.10"], "err_private")])
+def test_backup_keeps_definite_answers(api, dns, addresses, key):
+    api.response = FakeResponse(status_code=503)
+    api.fallback = FakeResponse(IPWHOIS_GOOGLE)
+    dns.records["site.example"] = addresses
+    with pytest.raises(bot.LookupFailed) as e:
+        bot.get_ip_info("site.example")
+    assert e.value.key == key
+    assert api.fallback_calls == []
+
+
+def test_no_backup_for_ipapi_answers(api):
+    api.response = FakeResponse({"status": "fail", "message": "invalid query"})
+    api.fallback = FakeResponse(IPWHOIS_GOOGLE)
+    with pytest.raises(bot.LookupFailed):
+        bot.get_ip_info("example.com")
+    assert api.fallback_calls == []
+
+
+@pytest.mark.parametrize("fallback", [
+    FakeResponse({"success": False, "message": "Invalid IP address"}),
+    FakeResponse(status_code=500),
+    requests.Timeout("slow"),
+])
+def test_backup_failure_shows_ipapi_reason(api, fallback):
+    api.response = FakeResponse(status_code=429)
+    api.fallback = fallback
+    with pytest.raises(bot.LookupFailed) as e:
+        bot.get_ip_info("8.8.8.8")
+    assert e.value.key == "err_rate_limit"
+
+
+def test_backup_429_pauses_it(api):
+    api.response = FakeResponse(status_code=503)
+    api.fallback = FakeResponse(status_code=429, headers={"Retry-After": "86400"})
+    for ip in ("8.8.8.8", "1.1.1.1"):
+        with pytest.raises(bot.LookupFailed) as e:
+            bot.get_ip_info(ip)
+        assert e.value.key == "err_unavailable"
+    assert len(api.fallback_calls) == 1
 
 
 # ---------- formatting ----------
@@ -322,7 +500,7 @@ def test_map_pin_then_card(api, sent):
     assert [c[0] for c in sent] == ["send_venue", "send_message"]
     _, venue_args, venue_kwargs = sent[0]
     assert venue_args == (1, 39.03, -77.5, "Ashburn, Virginia, United States", "8.8.8.8 · Google LLC")
-    assert venue_kwargs["reply_to_message_id"] == 7  # only the map quotes the request
+    assert venue_kwargs["reply_parameters"].message_id == 7  # only the map quotes the request
     _, args, kwargs = sent[1]
     assert args[0] == 1 and "Ashburn" in args[1]
     assert "reply_markup" not in kwargs  # no buttons under the card
@@ -377,7 +555,7 @@ def test_start_escapes_name(sent):
 
 
 def test_inline_query_results(api, sent):
-    bot.handle_inline_query(SimpleNamespace(id="q1", query="8.8.8.8", from_user=SimpleNamespace(language_code="ru")))
+    bot.handle_inline_query(make_inline_query("8.8.8.8", lang="ru"))
     method, args, kwargs = sent[0]
     results = args[1]
     assert method == "answer_inline_query"
@@ -391,6 +569,27 @@ def test_inline_query_results(api, sent):
     assert results[0].reply_markup is None
     assert kwargs["button"] is None
     assert kwargs["is_personal"] is True  # results are localized per user
+    assert bot._latest_inline == {}
+
+
+def test_inline_query_skipped_when_user_types_on(api, sent, whois, monkeypatch):
+    # One more letter arrives during the pause: "google.co" -> "google.com"
+    monkeypatch.setattr(bot.time, "sleep", lambda seconds: bot._latest_inline.update({42: "q2"}))
+    bot.handle_inline_query(make_inline_query("google.co", query_id="q1"))
+    assert sent == []
+    assert api.calls == [] and whois.calls == []
+    assert bot._latest_inline == {42: "q2"}
+
+
+def test_inline_mode_leaves_ipapi_requests_for_messages(api, sent):
+    api.response = FakeResponse(GOOGLE_DNS, headers={"X-Rl": str(bot.API_RESERVE), "X-Ttl": "30"})
+    api.fallback = FakeResponse(IPWHOIS_GOOGLE)
+    bot.handle_text(make_message("8.8.8.8"))
+    bot.handle_inline_query(make_inline_query("1.1.1.1"))
+    assert len(api.calls) == 1 and len(api.fallback_calls) == 1  # inline went to the backup
+    assert [r.type for r in sent[-1][1][1]] == ["article", "venue"]
+    bot.handle_text(make_message("9.9.9.9"))
+    assert len(api.calls) == 2  # messages still get ip-api
 
 
 def test_start_help_from_inline_button_shows_help(sent):
@@ -399,7 +598,7 @@ def test_start_help_from_inline_button_shows_help(sent):
 
 
 def test_inline_query_invalid_shows_hint(api, sent):
-    bot.handle_inline_query(SimpleNamespace(id="q2", query="goo", from_user=SimpleNamespace(language_code="en")))
+    bot.handle_inline_query(make_inline_query("goo"))
     _, args, kwargs = sent[0]
     assert args[1] == []
     assert kwargs["button"].text == t("en", "inline_hint")

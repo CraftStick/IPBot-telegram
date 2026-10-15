@@ -1,0 +1,20 @@
+# Monthly pull requests with dependency updates; CI runs the tests on each of them
+version: 2
+updates:
+  - package-ecosystem: pip
+    directories: ["/", "/ipbot"]
+    schedule:
+      interval: monthly
+    groups:
+      python:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly

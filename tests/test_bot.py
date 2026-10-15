@@ -7,7 +7,7 @@ import telebot
 
 import bot
 from domaininfo import DomainInfo
-from texts import NETWORK_EMOJI, PIN_EMOJI, TEXTS, format_duration, get_lang, t
+from texts import TEXTS, format_duration, get_lang, t
 
 GOOGLE_DNS = {
     "status": "success",
@@ -181,7 +181,7 @@ NOON_UTC = datetime(2026, 1, 15, 12, 0, tzinfo=timezone.utc)
 def test_format_ip_info_en():
     text = bot.format_ip_info(GOOGLE_DNS, "8.8.8.8", now=NOON_UTC)
     assert text.startswith("🇺🇸 <code>8.8.8.8</code> · IPv4\n")
-    assert f"{PIN_EMOJI} <b>Location</b>\n<blockquote>Ashburn, Virginia, United States\n" in text
+    assert "📍 <b>Location</b>\n<blockquote>Ashburn, Virginia, United States\n" in text
     assert "<b>Continent:</b> North America\n" in text
     assert "<b>ZIP code:</b> <code>20149</code>\n" in text
     assert "<b>Timezone:</b> America/New_York (UTC−5), now 07:00\n" in text
@@ -201,8 +201,8 @@ def test_format_ip_info_marks_mobile_network():
 def test_format_ip_info_ru_with_domain():
     text = bot.format_ip_info(GOOGLE_DNS, "dns.google", "ru", now=NOON_UTC)
     assert text.startswith("🇺🇸 <b>dns.google</b>\n<code>8.8.8.8</code> · IPv4\n")
-    assert f"{PIN_EMOJI} <b>Местоположение</b>" in text
-    assert f"{NETWORK_EMOJI} <b>Сеть</b>" in text
+    assert "📍 <b>Местоположение</b>" in text
+    assert "📡 <b>Сеть</b>" in text
     assert "сейчас 07:00" in text
     assert "<b>Провайдер:</b> Google LLC" in text
 
@@ -388,7 +388,6 @@ def test_inline_query_results(api, sent):
     message_text = results[0].input_message_content.message_text
     assert "📍 <b>Местоположение</b>" in message_text
     assert "📡 <b>Сеть</b>" in message_text
-    assert "<tg-emoji" not in message_text  # animated emoji only work in the bot's own messages
     assert results[0].reply_markup is None
     assert kwargs["button"] is None
     assert kwargs["is_personal"] is True  # results are localized per user

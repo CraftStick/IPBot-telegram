@@ -8,8 +8,6 @@ EXAMPLES = "<code>8.8.8.8</code>, <code>2606:4700::1111</code>, <code>google.com
 # otherwise Telegram shows the plain emoji inside the tag.
 WAVE_EMOJI = '<tg-emoji emoji-id="5222459157084411333">👋</tg-emoji>'
 CHAT_EMOJI = '<tg-emoji emoji-id="5294450432532323035">💬</tg-emoji>'
-PIN_EMOJI = '<tg-emoji emoji-id="5226924660351840411">📍</tg-emoji>'
-NETWORK_EMOJI = '<tg-emoji emoji-id="5426842241085743267">🤪</tg-emoji>'  # replaces 📡 in the Network header
 
 TEXTS = {
     "en": {

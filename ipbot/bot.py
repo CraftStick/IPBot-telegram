@@ -19,7 +19,7 @@ import telebot
 from telebot import types
 
 import domaininfo
-from texts import DEFAULT_LANG, LANGUAGES, NETWORK_EMOJI, PIN_EMOJI, format_duration, get_lang, t
+from texts import DEFAULT_LANG, LANGUAGES, format_duration, get_lang, t
 
 logging.basicConfig(
     level=logging.INFO,
@@ -307,12 +307,8 @@ def format_whois(whois, query, lang, now):
     return rows
 
 
-def format_ip_info(info, query, lang=DEFAULT_LANG, now=None, whois=None, animated=True):
-    """Format IP information into an HTML message.
-
-    animated=False keeps plain emoji: Telegram allows animated (custom) emoji only
-    in messages the bot sends itself, not in ones sent via inline mode.
-    """
+def format_ip_info(info, query, lang=DEFAULT_LANG, now=None, whois=None):
+    """Format IP information into an HTML message."""
     esc = html.escape
     ip = info.get("query", query)
     flag = get_emoji_flag(info.get("countryCode"))
@@ -342,7 +338,7 @@ def format_ip_info(info, query, lang=DEFAULT_LANG, now=None, whois=None, animate
         location.append(row(lang, "timezone", format_timezone(info["timezone"], lang, now)))
     if has_coordinates(info):
         location.append(row(lang, "coords", f"<code>{info['lat']}, {info['lon']}</code>"))
-    section(PIN_EMOJI if animated else "📍", "section_location", location)
+    section("📍", "section_location", location)
 
     network = []
     if info.get("isp"):
@@ -353,7 +349,7 @@ def format_ip_info(info, query, lang=DEFAULT_LANG, now=None, whois=None, animate
         network.append(row(lang, "as", esc(format_as(info))))
     if info.get("reverse"):
         network.append(row(lang, "reverse", f"<code>{esc(info['reverse'])}</code>"))
-    section(NETWORK_EMOJI if animated else "📡", "section_network", network)
+    section("📡", "section_network", network)
 
     if whois:
         section("🌐", "section_whois", format_whois(whois, query, lang, now or datetime.now(timezone.utc)))
@@ -474,7 +470,7 @@ def handle_inline_query(inline_query):
                 title=f"{get_emoji_flag(info.get('countryCode'))} {ip}",
                 description=description,
                 input_message_content=types.InputTextMessageContent(
-                    format_ip_info(info, query, lang, whois=whois, animated=False),
+                    format_ip_info(info, query, lang, whois=whois),
                     parse_mode="HTML",
                     disable_web_page_preview=True,
                 ),

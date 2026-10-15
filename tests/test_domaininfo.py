@@ -31,6 +31,27 @@ GTLD_WHOIS = """\
    Registrar: MarkMonitor Inc.
 """
 
+EU_WHOIS = """\
+% WHOIS vollecrypt.eu
+Domain: vollecrypt.eu
+Script: LATIN
+
+Registrant:
+        NOT DISCLOSED!
+        Visit www.eurid.eu for the web-based WHOIS.
+
+Technical:
+        Organisation: Spaceship, Inc
+        Email: support@spaceship.com
+
+Registrar:
+        Name: Spaceship, Inc.
+        Website: https://www.spaceship.com/
+
+Name servers:
+        martha.ns.cloudflare.com
+"""
+
 RDAP_JSON = {
     "ldhName": "GOOGLE.COM",
     "events": [
@@ -85,6 +106,11 @@ def test_parse_whois_gtld():
     assert info.registrar == "MarkMonitor Inc."  # not "Registrar WHOIS Server" / "Registrar URL"
     assert info.created.date() == utc(2013, 3, 8).date()
     assert info.expires.date() == utc(2027, 3, 8).date()
+
+
+def test_parse_whois_eu_block_format():
+    # EURid publishes no dates, only the registrar inside an indented block
+    assert domaininfo.parse_whois(EU_WHOIS, "vollecrypt.eu") == DomainInfo("vollecrypt.eu", "Spaceship, Inc.")
 
 
 def test_parse_whois_not_found():

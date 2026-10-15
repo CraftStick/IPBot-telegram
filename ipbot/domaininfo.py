@@ -159,11 +159,20 @@ def whois_server(tld):
 
 
 def parse_whois(text, domain):
-    """Pick registrar and dates out of a WHOIS response; None if there are none."""
+    """Pick registrar and dates out of a WHOIS response; None if there are none.
+
+    Besides flat "Registrar: X" lines it understands indented blocks (.eu and others):
+    "Registrar:" followed by "    Name: X" is read as "registrar name: X".
+    """
     values = {}
+    section = None
     for line in text.splitlines():
         key, sep, value = line.partition(":")
         key, value = key.strip().lower(), value.strip()
+        if not line[:1].isspace():
+            section = key if sep and not value else None  # "Registrar:" opens a block
+        elif section:
+            key = f"{section} {key}"
         if not sep or not value:
             continue
         for field, names in WHOIS_FIELDS.items():

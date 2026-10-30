@@ -1,41 +1,24 @@
-<div align="center">
+# IP Info Bot
 
-# 🌍 IP Info Bot
+[English](README.md) · [Русский](README.ru.md)
 
-**A Telegram bot that tells you everything about an IP address or domain**
+A Telegram bot that tells you everything about an IP address or domain: location on an interactive map, provider and AS, WHOIS, inline mode, English and Russian interface.
 
-[![Tests](https://github.com/CraftStick/IPBot-telegram/actions/workflows/tests.yml/badge.svg)](https://github.com/CraftStick/IPBot-telegram/actions/workflows/tests.yml)
+<p align="center"><img src="docs/preview.svg" alt="Bot reply: a map pin and a card with location, network and WHOIS info" width="420"></p>
 
-Location on an interactive map · provider & AS · WHOIS · inline mode · 🇬🇧 English / 🇷🇺 Russian
-
-[Features](#-features) •
-[Quick start](#-quick-start) •
-[Docker](#-docker) •
-[Usage](#-usage) •
-[How it works](#%EF%B8%8F-how-it-works) •
-[FAQ](#-faq)
-
-<br>
-
-<img src="docs/preview.svg" alt="Bot reply: a map pin and a card with location, network and WHOIS info" width="420">
-
-</div>
-
-<br>
-
-## ✨ Features
+## Features
 
 <table>
 <tr>
 <td width="50%" valign="top">
 
-### 🔎 Any input
+### Any input
 IPv4, IPv6, domains (even `пример.рф`), links like `https://site.com/page` and `host:port` — just paste it.
 
 </td>
 <td width="50%" valign="top">
 
-### 🗺️ Interactive map
+### Interactive map
 A Telegram map pin you can pinch and drag comes with every answer.
 
 </td>
@@ -43,13 +26,13 @@ A Telegram map pin you can pinch and drag comes with every answer.
 <tr>
 <td valign="top">
 
-### 📍 Location
+### Location
 Country with flag, region, city, ZIP code, continent, timezone with the current local time and coordinates.
 
 </td>
 <td valign="top">
 
-### 📡 Network
+### Network
 Internet provider, organization, autonomous system (AS) and hostname (PTR).
 
 </td>
@@ -57,13 +40,13 @@ Internet provider, organization, autonomous system (AS) and hostname (PTR).
 <tr>
 <td valign="top">
 
-### 🌐 WHOIS for domains
+### WHOIS for domains
 Registrar, registration and expiry dates — with a ⚠️ warning when the domain expires within 30 days.
 
 </td>
 <td valign="top">
 
-### 📱 Mobile networks
+### Mobile networks
 Flags addresses that belong to mobile networks.
 
 </td>
@@ -71,20 +54,20 @@ Flags addresses that belong to mobile networks.
 <tr>
 <td valign="top">
 
-### 💬 Inline mode
+### Inline mode
 Type `@your_bot 8.8.8.8` in any chat and send the card right there — no need to open the bot.
 
 </td>
 <td valign="top">
 
-### 🇷🇺 Two languages
+### Two languages
 English and Russian, picked automatically from the user's Telegram language — country and city names too.
 
 </td>
 </tr>
 </table>
 
-## 🚀 Quick start
+## Quick start
 
 > **You need:** Python 3.10+ and a bot token from [@BotFather](https://t.me/botfather).
 
@@ -117,7 +100,7 @@ python ipbot/bot.py
 > [!TIP]
 > To make `@your_bot 8.8.8.8` work in any chat, send `/setinline` to [@BotFather](https://t.me/botfather), pick your bot and enter a placeholder like `IP address or domain`.
 
-## 🐳 Docker
+## Docker
 
 ```bash
 cp .env.example .env          # put your token into .env
@@ -126,7 +109,7 @@ docker compose up -d --build
 
 The image contains only the bot code, runs as a non-root user and restarts automatically.
 
-## 📖 Usage
+## Usage
 
 Send the bot an IP address, a domain or a link — or use a command:
 
@@ -141,7 +124,7 @@ Send the bot an IP address, a domain or a link — or use a command:
 
 In groups the bot answers only to commands, so it doesn't react to every message.
 
-## ⚙️ How it works
+## How it works
 
 | Data | Source | Notes |
 |:--|:--|:--|
@@ -156,7 +139,7 @@ WHOIS is requested in parallel with the geolocation, so domains don't wait twice
 Inline mode waits for a short pause in typing before looking anything up, so `google.co` on the way to `google.com` doesn't cost a request, and it leaves the last 10 ip-api requests of each minute to messages and commands.
 
 <details>
-<summary><b>📁 Project structure</b></summary>
+<summary><b>Project structure</b></summary>
 
 <br>
 
@@ -181,7 +164,7 @@ IPBot-telegram/
 </details>
 
 <details>
-<summary><b>🧪 Tests</b></summary>
+<summary><b>Tests</b></summary>
 
 <br>
 
@@ -194,7 +177,7 @@ Tests need neither a bot token nor internet access: Telegram, ip-api, ipwho.is, 
 
 </details>
 
-## ❓ FAQ
+## FAQ
 
 <details>
 <summary><b>Can the bot show my own IP?</b></summary>
@@ -238,7 +221,7 @@ Some zones (e.g. `.de`) don't publish registration dates at all. For `.ru` / `.�
 
 </details>
 
-## 🤝 Contributing
+## Contributing
 
 Ideas and pull requests are welcome! Found a bug? [Open an issue](https://github.com/CraftStick/IPBot-telegram/issues).
 
@@ -246,16 +229,6 @@ Ideas and pull requests are welcome! Found a bug? [Open an issue](https://github
 2. Make sure `pytest` passes
 3. Open a pull request
 
-## 📄 License
+## License
 
 [MIT](LICENSE) © [CraftStick](https://github.com/CraftStick)
-
-<div align="center">
-
-<br>
-
-**If the bot was useful — give it a ⭐, it really helps!**
-
-Если было полезно — поставь ⭐, это очень помогает!
-
-</div>
